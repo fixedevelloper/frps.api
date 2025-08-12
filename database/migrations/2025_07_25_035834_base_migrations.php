@@ -187,10 +187,10 @@ return new class extends Migration
         });
         Schema::create('notifications', function (Blueprint $table) {
             $table->id();
-            $table->string('from',244)->nullable(false);
             $table->string('type',244)->nullable();
             $table->text('description')->nullable();
-            $table->foreignId('order_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('from_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('to_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
     }

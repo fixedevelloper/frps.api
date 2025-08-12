@@ -27,6 +27,7 @@ Route::middleware(['jwt.verify','jwt.auth'])->group(function () {
     Route::get('categories', [CatalogueController::class, 'categories']);
     Route::get('categories/all', [CatalogueController::class, 'all_categories']);
     Route::get('products', [CatalogueController::class, 'products']);
+    Route::get('catalogues', [CustomerController::class, 'index']);
     Route::get('products/waiting', [CatalogueController::class, 'productsWaiting']);
     Route::get('products/publish/{id}', [CatalogueController::class, 'publishProduct']);
     Route::get('products/{id}', [CatalogueController::class, 'getProductByID']);
@@ -49,5 +50,8 @@ Route::middleware(['jwt.verify','jwt.auth'])->group(function () {
     Route::put('/livraisons/{id}/expedier', [LivraisonController::class, 'marquerExpedie']);
     Route::put('/livraisons/{id}/confirmer', [LivraisonController::class, 'confirmerReception']);
     Route::post('/livraisons/{id}/probleme', [LivraisonController::class, 'signalerProbleme']);
+
+    Route::get('customers/info', [CustomerController::class, 'getInfo']);
+    Route::post('customers/update', [CustomerController::class, 'updateInfo']);
 
 });

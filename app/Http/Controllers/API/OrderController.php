@@ -15,8 +15,10 @@ use App\Models\Paiement;
 use App\Models\Product;
 use App\Models\ProductCommande;
 use App\Models\ReturnRequest;
+use App\Notifications\NewOrderNotification;
 use App\Notifications\OrderIssueNotification;
 use App\Notifications\ProformaGenerated;
+use App\Notifications\ReturnOrderNotification;
 use App\Services\PdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -194,14 +196,7 @@ class OrderController extends Controller
                     'amount' => $prod['quantity'] * $product->price,
                 ]);
             }
-
-            // Optionnel : préparer la livraison
-            /*            Livraison::create([
-                            'commande_id' => $commande->id,
-                            'status' => 'prévue',
-                            'address' => $request->address ?? '',
-                        ]);*/
-
+            Notification::route('mail', 'support@frps.com')->notify(new NewOrderNotification($commande));
             DB::commit();
 
             return Helpers::success([
@@ -354,10 +349,12 @@ class OrderController extends Controller
             $returnRequest->photos = json_encode($paths);
             $returnRequest->save();
         }
-
+/*        $notification=\App\Models\Notification::create([
+            'type'=>\App\Models\Notification::ORDERTYPE,
+        ]);*/
         // Notification éventuelle (ex: support)
-/*        Notification::route('mail', 'support@frps.com')
-            ->notify(new OrderIssueNotification($returnRequest));*/
+        Notification::route('mail', 'support@frps.com')
+            ->notify(new ReturnOrderNotification($returnRequest));
 
         return Helpers::success($returnRequest, 'Demande de retour enregistrée avec succès.');
     }
@@ -373,7 +370,7 @@ class OrderController extends Controller
 
         switch ($status){
             case 3:
-                // TODO : envoyer notification de rejet
+                Notification::route('mail', $commande->customer->email)->notify(new NewOrderNotification($commande));
             case 4:
                 $this->pdfService->generateProformat($commande);
                 if ($commande->customer && $commande->customer->email) {
@@ -388,42 +385,53 @@ class OrderController extends Controller
         return Helpers::success($commande, 'Statut mis à jour avec succès.');
     }
 
+
     public function paiementFacture(Request $request)
     {
-        $commande = Commande::findOrFail($request->order_id); // fail si la commande n'existe pas
+        DB::beginTransaction();
 
-        // Calcul du montant restant avant ce paiement
-        $ancienReste = $commande->rest_to_pay;
+        try {
+            $commande = Commande::findOrFail($request->order_id);
 
-        // Création du paiement
-        $paiement = Paiement::create([
-            'commande_id' => $request->order_id,
-            'montant' => $request->amount,
-            'methode' => $request->methodPayment,
-            'etat' => Helper::PAIEMENTETATCOMPLET,
-            'date_paiement' => date('Y-m-d')
-        ]);
+            // Montant déjà payé avant ce paiement
+            $totalPayeAvant = $commande->total - $commande->rest_to_pay;
 
-        // Mise à jour du montant restant
-        $nouveauReste = $ancienReste - $request->amount;
+            // Vérification : empêcher de dépasser le total
+            if ($totalPayeAvant + $request->amount > $commande->total) {
+                return Helpers::error("Le montant payé dépasse le total de la commande.");
+            }
 
-        // Évite les montants négatifs
-        $commande->update([
-            'status' => Helper::STATUSPROCESSING,
-            'rest_to_pay' => max($nouveauReste, 0)
-        ]);
+            // Création du paiement
+            $paiement = Paiement::create([
+                'commande_id'   => $request->order_id,
+                'montant'       => $request->amount,
+                'methode'       => $request->methodPayment,
+                'etat'          => Helper::PAIEMENTETATCOMPLET,
+                'date_paiement' => date('Y-m-d')
+            ]);
 
-        // Générer bordereau de livraison
-        $this->pdfService->generateBordereau($commande);
+            // Mise à jour du montant restant
+            $nouveauReste = $commande->rest_to_pay - $request->amount;
+            $commande->update([
+                'status'      => Helper::STATUSPROCESSING,
+                'rest_to_pay' => max($nouveauReste, 0)
+            ]);
 
-        // Générer facture définitive AVEC TVA
-        //  $this->pdfService->generateFacture($commande, true); // true pour inclure TVA
+            // Générer bordereau seulement au premier paiement
+            if ($totalPayeAvant == 0) {
+                $this->pdfService->generateBordereau($commande);
+            }
 
-        // Notification possible ici si tu veux
-        // Notification::route(...)->notify(new FactureGenereeNotification(...));
+            DB::commit();
 
-        return Helpers::success($commande);
+            return Helpers::success($commande);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return Helpers::error("Erreur lors du paiement : " . $e->getMessage());
+        }
     }
+
 
     public function paiementCustomer(Request $request)
     {
