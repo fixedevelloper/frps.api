@@ -39,9 +39,9 @@ class Commande extends Model
         return $this->hasMany(Paiement::class);
     }
 
-    public function delivery()
+    public function transporteur()
     {
-        return $this->hasOne(Livraison::class, 'commande_id');
+        return $this->belongsTo(Transporteur::class);
     }
 
     public function litiges()

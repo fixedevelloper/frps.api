@@ -86,6 +86,7 @@ class SettingController extends Controller
             'name' => 'required|string',
             'phone' => 'required|string',
             'email' => 'required|string',
+            'type' => 'required|string',
             'image' => 'nullable|image|max:2048' // max 2 Mo
         ]);
 
@@ -98,7 +99,7 @@ class SettingController extends Controller
             'name' => $validated['name'],
             'phone' => $validated['phone'],
             'email' => $validated['email'],
-            'user_type' => User::AGENT_TYPE,
+            'user_type' => $validated['type']=='chauffeur'?User::DRIVER_TYPE: User::AGENT_TYPE,
             'password' => Hash::make('123456789'),
         ]);
         if ($request->hasFile('image')) {

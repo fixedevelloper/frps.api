@@ -44,7 +44,8 @@ class JWTAuthController extends Controller
 
         return Helpers::success([
             'token'=>$token,
-            'phone'=>$user->phone
+            'phone'=>$user->phone,
+            'username'=>$user->name
         ]);
     }
 
@@ -68,7 +69,8 @@ class JWTAuthController extends Controller
 
             return Helpers::success([
                 'token'=>$token,
-                'phone'=>$user->phone
+                'phone'=>$user->phone,
+                'username'=>$user->name
             ]);
         } catch (JWTException $e) {
             return Helpers::error('Could not create token');
@@ -94,7 +96,8 @@ class JWTAuthController extends Controller
 
             return Helpers::success([
                 'token'=>$token,
-                'phone'=>$user->phone
+                'phone'=>$user->phone,
+                'username'=>$user->name
             ]);
         } catch (JWTException $e) {
             return Helpers::error('Could not create token');

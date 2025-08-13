@@ -14,7 +14,8 @@ class User extends Authenticatable implements JWTSubject
 
 
     const ADMIN_TYPE = 0;
-    const AGENT_TYPE = 1;
+    const AGENT_TYPE = 3;
+    const DRIVER_TYPE = 1;
     const CUSTOMER_TYPE = 2;
 
     public function getJWTIdentifier()
@@ -74,5 +75,9 @@ class User extends Authenticatable implements JWTSubject
     public function departement()
     {
         return $this->belongsTo(Departement::class);
+    }
+    public function commandes()
+    {
+        return $this->hasMany(Commande::class);
     }
 }

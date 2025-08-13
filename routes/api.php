@@ -6,6 +6,7 @@ use App\Http\Controllers\API\JWTAuthController;
 use App\Http\Controllers\API\LivraisonController;
 use App\Http\Controllers\API\OrderController;
 use App\Http\Controllers\API\SettingController;
+use App\Http\Controllers\API\TransporteurController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -53,5 +54,11 @@ Route::middleware(['jwt.verify','jwt.auth'])->group(function () {
 
     Route::get('customers/info', [CustomerController::class, 'getInfo']);
     Route::post('customers/update', [CustomerController::class, 'updateInfo']);
+
+    Route::post('transporteurs', [TransporteurController::class, 'store']);
+    Route::get('transporteurs', [TransporteurController::class, 'transporteurs']);
+    Route::get('transporteurs/vehicules', [TransporteurController::class, 'vehicules']);
+    Route::get('transporteurs/chauffeurs', [TransporteurController::class, 'chauffeurs']);
+    Route::post('transporteurs/vehicules', [TransporteurController::class, 'vehiculestore']);
 
 });

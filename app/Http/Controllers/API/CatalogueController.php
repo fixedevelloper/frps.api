@@ -357,26 +357,78 @@ class CatalogueController extends Controller
             'produits' => 'required|array',
         ]);
 
+/*        foreach ($request->produits as $row) {
+            $nomFamille = trim($row['Famille']); // enlève espaces avant/après
+            $nomFamilleLower = mb_strtolower($nomFamille); // minuscule pour comparaison
+
+            $famille = Category::whereRaw('LOWER(intitule) = ?', [$nomFamilleLower])->first();
+
+            if (!$famille) {
+                // Créer seulement si pas trouvé
+                $famille = Category::create([
+                    'intitule' => $nomFamille
+                ]);
+            }
+        }*/
+        $categoriesCache = []; // pour éviter les requêtes répétées
+
         foreach ($request->produits as $row) {
-            Product::create([
-                'intitule' => $row['intitule'] ?? '',
-                'category_id' => $row['category_id'] ?? null,
-                'reference' => $row['reference'] ?? null,
-                'type_stock' => $row['type_stock'] ?? '',
-                'price' => $row['price'] ?? 0,
-                'price_buy' => $row['price_buy'] ?? 0,
-                'lot' => $row['lot'] ?? '',
-                'presentation' => $row['presentation'] ?? '',
-                'date_fabrication' => $row['dateFabrication'] ?? null,
-                'date_peremption' => $row['datePeremption'] ?? null,
-                'financement' => $row['financement'] ?? '',
-                'utilisateur_cible' => $row['utilisateurCible'] ?? '',
-                'quantite' => $row['quantite'] ?? 0,
-                'unite' => $row['unite'] ?? '',
-                'poids' => $row['poids'] ?? 0,
-                'created_by' => auth()->id() ?? 1, // ou autre valeur par défaut
-            ]);
+            // Nettoyer le nom de famille
+            $nomFamille = trim($row['Famille'] ?? '');
+            if (empty($nomFamille)) {
+                // On ignore les produits sans famille définie
+                continue;
+            }
+
+            $nomFamilleLower = mb_strtolower($nomFamille);
+
+            // Chercher dans le cache d'abord
+            if (isset($categoriesCache[$nomFamilleLower])) {
+                $famille = $categoriesCache[$nomFamilleLower];
+            } else {
+                // Vérifier si déjà existant en base (insensible à la casse)
+                $famille = Category::whereRaw('LOWER(intitule) = ?', [$nomFamilleLower])->first();
+
+                if (!$famille) {
+                    // Créer seulement si pas trouvé
+                    $famille = Category::create([
+                        'intitule' => $nomFamille
+                    ]);
+                }
+
+                // Stocker en cache
+                $categoriesCache[$nomFamilleLower] = $famille;
+            }
+
+            // Création du produit
+            Product::updateOrCreate(
+                [
+                    // Critères pour trouver un produit existant
+                    'intitule'   => $row['Désignation'] ?? '',
+                    'reference'   => $row['Référence article'] ?? null,
+                    'category_id' => $famille->id
+                ],
+                [
+                    // Valeurs à insérer ou mettre à jour
+                    'intitule'           => $row['Désignation'] ?? '',
+                    'type_stock'         => $row['type_stock'] ?? 'Lot',
+                    'price'              => $row['price'] ?? 0,
+                    'price_buy'          => $row['price_buy'] ?? 0,
+                    'lot'                => $row['lot'] ?? '',
+                    'presentation'       => $row['presentation'] ?? '',
+                    'date_fabrication'   => $row['dateFabrication'] ?? date('Y-m-d'),
+                    'date_peremption'    => $row['datePeremption'] ?? date('Y-m-d'),
+                    'financement'        => $row['financement'] ?? '',
+                    'utilisateur_cible'  => $row['utilisateurCible'] ?? '',
+                    'quantite'           => $row['quantite'] ?? 0,
+                    'unite'              => $row['unite'] ?? '',
+                    'poids'              => $row['poids'] ?? 0,
+                    'created_by'         => auth()->id() ?? 1,
+                ]
+            );
+
         }
+
 
         return response()->json(['message' => 'Produits importés avec succès']);
     }
