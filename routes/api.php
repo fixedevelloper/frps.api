@@ -55,10 +55,15 @@ Route::middleware(['jwt.verify','jwt.auth'])->group(function () {
     Route::get('customers/info', [CustomerController::class, 'getInfo']);
     Route::post('customers/update', [CustomerController::class, 'updateInfo']);
 
+    Route::put('/orders/{id}/assign-transporteur', [OrderController::class, 'assignTransporteur']);
+
     Route::post('transporteurs', [TransporteurController::class, 'store']);
     Route::get('transporteurs', [TransporteurController::class, 'transporteurs']);
     Route::get('transporteurs/vehicules', [TransporteurController::class, 'vehicules']);
     Route::get('transporteurs/chauffeurs', [TransporteurController::class, 'chauffeurs']);
     Route::post('transporteurs/vehicules', [TransporteurController::class, 'vehiculestore']);
+    Route::get('/transporteurs/{id}', [TransporteurController::class, 'show']);
+
+    Route::get('notifications', [SettingController::class, 'notifications']);
 
 });

@@ -11,6 +11,7 @@ use App\Models\City;
 use App\Models\Departement;
 use App\Models\Image;
 use App\Models\Litige;
+use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -21,6 +22,11 @@ class SettingController extends Controller
     public function departements(Request $request)
     {
         $departements = Departement::all();
+        return Helpers::success($departements);
+    }
+    public function notifications(Request $request)
+    {
+        $departements = Notification::all();
         return Helpers::success($departements);
     }
     public function cities(Request $request,$departement_id)
@@ -59,12 +65,13 @@ class SettingController extends Controller
         $litiges = User::with([
             'image',
             'city','departement'
-        ])->where(['user_type'=>User::AGENT_TYPE])->get();
+        ])->where(['user_type'=>User::AGENT_TYPE])->orWhere(['user_type'=>User::DRIVER_TYPE])->get();
 
         $items = $litiges->map(function ($payment) {
             return [
                 'id' => $payment->id,
                 'name' => $payment->name,
+                'role' => $payment->user_type==User::DRIVER_TYPE?'Chauffeur':'Agent',
                 'email' => $payment->email,
                 'phone' => $payment->phone,
                 'date' => $payment->created_at,

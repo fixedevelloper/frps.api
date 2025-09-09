@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use App\Models\Transporteur;
 use App\Models\TransporteurExterne;
 use App\Models\TransporteurInterne;
+use Illuminate\Support\Facades\DB;
 
 class TransporteurController extends Controller
 {
@@ -23,6 +24,7 @@ class TransporteurController extends Controller
             'type' => 'required|in:interne,externe',
         ]);
 
+        DB::beginTransaction();
         $transporteur = Transporteur::create([
             'nom' => $request->nom,
             'type' => $request->type,
@@ -47,7 +49,7 @@ class TransporteurController extends Controller
         if ($request->type === 'interne') {
             $request->validate([
                 'vehicule_id' => 'required|exists:vehicules,id',
-                'chauffeur_id' => 'required|exists:chauffeurs,id',
+                'chauffeur_id' => 'required|exists:users,id',
             ]);
             TransporteurInterne::create([
                 'transporteur_id' => $transporteur->id,
@@ -55,40 +57,41 @@ class TransporteurController extends Controller
                 'chauffeur_id' => $request->chauffeur_id,
             ]);
         }
-
+        DB::commit();
         return response()->json([
             'message' => 'Transporteur créé avec succès',
             'transporteur' => $transporteur
         ], 201);
     }
+
     public function vehicules()
     {
         return Helpers::success(Vehicule::all());
     }
+
     public function chauffeurs()
     {
-        $drivers=User::query()->where(['user_type'=>User::DRIVER_TYPE])->get();
+        $drivers = User::query()->where(['user_type' => User::DRIVER_TYPE])->get();
         return Helpers::success($drivers);
     }
+
     public function transporteurs(Request $request)
     {
         $categories = [];
         $perPage = $request->input('per_page', 5); // nombre d'éléments par page
         $page = $request->input('page', 1); // numéro de la page
 
-        $paginator = Transporteur::with(['parent', 'image'])->paginate($perPage, ['*'], 'page', $page);
+        $paginator = Transporteur::with([])->paginate($perPage, ['*'], 'page', $page);
 
         foreach ($paginator->items() as $cat) {
             $categories[] = [
                 'id' => $cat->id,
                 'name' => $cat->nom,
                 'type' => $cat->type,
-                'parent' => $cat->parent ? $cat->parent->intitule : null,
-                'image' => $cat->image ? $cat->image->src ?? null : null, // adapte 'url' selon ta colonne image
             ];
         }
 
-        return  response()->json([
+        return response()->json([
             'data' => $categories,
             'current_page' => $paginator->currentPage(),
             'last_page' => $paginator->lastPage(),
@@ -96,6 +99,7 @@ class TransporteurController extends Controller
             'total' => $paginator->total(),
         ]);
     }
+
     public function vehiculestore(Request $request)
     {
         $validated = $request->validate([
@@ -110,6 +114,12 @@ class TransporteurController extends Controller
             'message' => 'Véhicule ajouté avec succès',
             'vehicule' => $vehicule
         ], 201);
+    }
+    public function show($id)
+    {
+        $transporteur = Transporteur::with(['transporteurExterne', 'transporteurInterne'])->findOrFail($id);
+
+        return Helpers::success($transporteur);
     }
 }
 

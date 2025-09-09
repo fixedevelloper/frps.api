@@ -10,7 +10,7 @@ class Transporteur extends Model
 {
     protected $fillable = [
         'nom',
-        'type', // 'interne' ou 'externe'
+        'type','vehicule','chauffeur'
     ];
 
     public function transporteurExterne()

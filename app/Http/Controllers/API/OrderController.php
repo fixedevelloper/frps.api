@@ -43,7 +43,6 @@ class OrderController extends Controller
         $commandes = Commande::with([
             'customer',
             'products',
-            'delivery',
             'litiges'
         ])->where('customer_id', auth()->id())->get();
 
@@ -72,12 +71,12 @@ class OrderController extends Controller
                 }),
 
                 // Informations de livraison
-                'delivery' => $commande->delivery ? [
+/*                'delivery' => $commande->delivery ? [
                     'id' => $commande->delivery->id,
                     'status' => $commande->delivery->status,
                     'delivered_at' => $commande->delivery->delivered_at,
                     'address' => $commande->delivery->address,
-                ] : null,
+                ] : null,*/
 
                 // Litiges associés
                 'litiges' => $commande->litiges->map(function ($litige) {
@@ -98,14 +97,15 @@ class OrderController extends Controller
 
     public function orders(Request $request)
     {
-        $commandes = Commande::with([
+        $perPage = $request->input('per_page', 5); // nombre d'éléments par page
+        $page = $request->input('page', 1);
+        $paginator = Commande::with([
             'customer',
             'products',
-            'delivery',
             'litiges'
-        ])->get();
+        ])->paginate($perPage, ['*'], 'page', $page);
 
-        $orders = $commandes->map(function ($commande) {
+        $orders = $paginator->through(function ($commande) {
             return [
                 'id' => $commande->id,
                 'total' => $commande->total,
@@ -113,44 +113,33 @@ class OrderController extends Controller
                 'validatedStatus' => $commande->stringValidatedStatus->value,
                 'date' => $commande->created_at,
                 'customer_image' => $commande->customer,
-                'customer_name' => $commande->customer
-                    ? $commande->customer->name
-                    : null,
-
-                // Produits commandés
-                'items' => $commande->products->map(function ($item) {
-                    return [
-                        'id' => $item->id,
-                        'amount' => $item->amount,
-                        'order_id' => $item->commande_id,
-                        'product' => $item->product_name ?? 'N/A', // adapte si relation
-                        'product_price' => $item->product_price,
-                        'quantity' => $item->quantity,
-                    ];
-                }),
-
-                // Informations de livraison
-                'delivery' => $commande->delivery ? [
-                    'id' => $commande->delivery->id,
-                    'status' => $commande->delivery->status,
-                    'delivered_at' => $commande->delivery->delivered_at,
-                    'address' => $commande->delivery->address,
-                ] : null,
-
-                // Litiges associés
-                'litiges' => $commande->litiges->map(function ($litige) {
-                    return [
-                        'id' => $litige->id,
-                        'motif' => $litige->motif,
-                        'status' => $litige->status,
-                        'commentaire' => $litige->commentaire,
-                        'created_at' => $litige->created_at,
-                    ];
-                }),
+                'customer_name' => $commande->customer ? $commande->customer->name : null,
+                'items' => $commande->products->map(fn ($item) => [
+                    'id' => $item->id,
+                    'amount' => $item->amount,
+                    'order_id' => $item->commande_id,
+                    'product' => $item->product_name ?? 'N/A',
+                    'product_price' => $item->product_price,
+                    'quantity' => $item->quantity,
+                ]),
+                'litiges' => $commande->litiges->map(fn ($litige) => [
+                    'id' => $litige->id,
+                    'motif' => $litige->motif,
+                    'status' => $litige->status,
+                    'commentaire' => $litige->commentaire,
+                    'created_at' => $litige->created_at,
+                ]),
             ];
         });
 
-        return Helpers::success($orders);
+        return Helpers::success([
+            'data' => $orders->items(),
+            'current_page' => $orders->currentPage(),
+            'last_page' => $orders->lastPage(),
+            'per_page' => $orders->perPage(),
+            'total' => $orders->total(),
+        ]);
+
     }
 
     public function storeOrder(Request $request)
@@ -215,7 +204,7 @@ class OrderController extends Controller
         $commande = Commande::with([
             'customer',
             'products',
-            'delivery',
+            'transporteur',
             'litiges'
         ])->find($id);
 
@@ -248,12 +237,12 @@ class OrderController extends Controller
                 ];
             }),
 
-            // Informations de livraison
-            'delivery' => $commande->delivery ? [
-                'id' => $commande->delivery->id,
-                'status' => $commande->delivery->status,
-                'delivered_at' => $commande->delivery->delivered_at,
-                'address' => $commande->delivery->address,
+
+            'delivery' => $commande->transporteur ? [
+                'id' => $commande->transporteur->id,
+                'type' => $commande->transporteur->type,
+                'delivered_at' => $commande->transporteur->delivered_at,
+                'name' => $commande->transporteur->nom,
             ] : null,
 
             // Litiges associés
@@ -357,6 +346,21 @@ class OrderController extends Controller
             ->notify(new ReturnOrderNotification($returnRequest));
 
         return Helpers::success($returnRequest, 'Demande de retour enregistrée avec succès.');
+    }
+    public function assignTransporteur(Request $request, $id)
+    {
+        $request->validate([
+            'transporteur_id' => 'required|exists:transporteurs,id'
+        ]);
+
+        $commande = Commande::findOrFail($id);
+        $commande->transporteur_id = $request->transporteur_id;
+        $commande->save();
+
+        return response()->json([
+            'message' => 'Transporteur assigné avec succès',
+            'commande' => $commande
+        ]);
     }
 
     public function getByOrder($orderId)
