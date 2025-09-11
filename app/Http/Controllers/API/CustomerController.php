@@ -6,6 +6,7 @@ namespace App\Http\Controllers\API;
 
 use App\Helpers\api\Helpers;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ProductResource;
 use App\Models\Litige;
 use App\Models\Paiement;
 use App\Models\Product;
@@ -95,7 +96,7 @@ class CustomerController extends Controller
             'total' => $products->total(),
             'current_page' => $products->currentPage(),
             'last_page' => $products->lastPage(),
-            'data' => $products->items(),
+            'data' => ProductResource::collection($products->items()),
         ]);
     }
     // Récupérer infos du client connecté

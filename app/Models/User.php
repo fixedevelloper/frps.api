@@ -80,4 +80,8 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasMany(Commande::class);
     }
+    public function routeNotificationForSms()
+    {
+        return $this->phone; // colonne phone dans la DB
+    }
 }

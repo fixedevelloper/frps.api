@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Setting;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -13,19 +14,27 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::factory()->create([
+/*        User::factory()->create([
             'name' => 'Super Admin',
             'email' => 'admin@localhost.com',
             'phone' => '675066919',
             'user_type'=>0
+        ]);*/
+        Setting::create([
+            'name' => 'FRPS',
+            'email' => 'admin@localhost.com',
+            'phone' => '675066919',
+            'address' => '675066919',
+            'logo' => '675066919',
+            'notification_address' => 'support@frps.cm',
+            'notification_phone' => '237675066919',
         ]);
-
         $this->call([
             //ImageSeeder::class,
             //CategorySeeder::class,
            // ProductSeeder::class,
            // DepartementSeeder::class,
-            CitySeeder::class
+           // CitySeeder::class
         ]);
     }
 }

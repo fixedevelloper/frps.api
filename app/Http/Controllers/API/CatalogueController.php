@@ -7,15 +7,13 @@ namespace App\Http\Controllers\API;
 use App\Helpers\api\Helpers;
 use App\Helpers\Helper;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ProductResource;
 use App\Models\Category;
-use App\Models\Commande;
 use App\Models\EnterStock;
 use App\Models\Image;
 use App\Models\Product;
 use App\Models\User;
-use App\Notifications\ProformaGenerated;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -156,30 +154,9 @@ class CatalogueController extends Controller
 
         $paginator = Product::with(['category', 'image'])->where(['publish' => true])->paginate($perPage, ['*'], 'page', $page);
 
-        $products = [];
-        foreach ($paginator->items() as $cat) {
-            $products[] = [
-                'id' => $cat->id,
-                'intitule' => $cat->intitule,
-                'price' => $cat->price,
-                'referenceProduit' => $cat->reference,
-                'categorie' => $cat->category ? $cat->category->intitule : null,
-                'numeroLot' => $cat->lot,
-                'quantiteParUnite' => $cat->quantite,
-                'uniteDeMesure' => $cat->unite,
-                'poidsDimension' => $cat->poids,
-                'financement' => $cat->financement,
-                'utilisateurCible' => $cat->utilisateur_cible,
-                'dateFabrication' => $cat->date_fabrication,
-                'datePeremption' => $cat->date_peremption,
-                'status' => $cat->publish ? 'publie' : 'En attente',
-                //  'image' => $cat->image ? config('app.url') . 'storage/' . ($cat->image->src ?? '') : null,
-                'image' => $cat->image ? ($cat->image->src ?? '') : null,
-            ];
-        }
 
         return response()->json([
-            'data' => $products,
+            'data' => ProductResource::collection($paginator->items()),
             'current_page' => $paginator->currentPage(),
             'last_page' => $paginator->lastPage(),
             'per_page' => $paginator->perPage(),
@@ -264,28 +241,7 @@ class CatalogueController extends Controller
     {
         $cat = Product::findOrFail($id);
 
-        $product = [
-            'id' => $cat->id,
-            'intitule' => $cat->intitule,
-            'price' => $cat->price,
-            'referenceProduit' => $cat->reference,
-            'categorie' => $cat->category ? $cat->category->intitule : null,
-            'category_id' => $cat->category ? $cat->category->id : null,
-            'numeroLot' => $cat->lot,
-            'quantiteParUnite' => $cat->quantite,
-            'uniteDeMesure' => $cat->unite,
-            'poidsDimension' => $cat->poids,
-            'financement' => $cat->financement,
-            'utilisateurCible' => $cat->utilisateur_cible,
-           'presentation' => $cat->presentation,
-            'dateFabrication' => $cat->date_fabrication,
-            'datePeremption' => $cat->date_peremption,
-            'status' => $cat->publish ? 'publie' : 'En attente',
-            //  'image' => $cat->image ? config('app.url') . 'storage/' . ($cat->image->src ?? '') : null,
-            'image' => $cat->image ? ($cat->image->src ?? '') : null,
-            'suivi_stock'=>$cat->type_stock
-        ];
-        return Helpers::success($product, 'Statut mis à jour avec succès.');
+        return Helpers::success(new ProductResource($cat), 'Statut mis à jour avec succès.');
     }
     public function updateProduct(Request $request,$id)
     {

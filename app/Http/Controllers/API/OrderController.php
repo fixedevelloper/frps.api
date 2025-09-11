@@ -15,12 +15,16 @@ use App\Models\Paiement;
 use App\Models\Product;
 use App\Models\ProductCommande;
 use App\Models\ReturnRequest;
+use App\Models\Setting;
+use App\Models\User;
 use App\Notifications\NewOrderNotification;
 use App\Notifications\OrderIssueNotification;
 use App\Notifications\ProformaGenerated;
 use App\Notifications\ReturnOrderNotification;
+use App\Notifications\SmsNotification;
 use App\Services\PdfService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
@@ -71,12 +75,12 @@ class OrderController extends Controller
                 }),
 
                 // Informations de livraison
-/*                'delivery' => $commande->delivery ? [
-                    'id' => $commande->delivery->id,
-                    'status' => $commande->delivery->status,
-                    'delivered_at' => $commande->delivery->delivered_at,
-                    'address' => $commande->delivery->address,
-                ] : null,*/
+                /*                'delivery' => $commande->delivery ? [
+                                    'id' => $commande->delivery->id,
+                                    'status' => $commande->delivery->status,
+                                    'delivered_at' => $commande->delivery->delivered_at,
+                                    'address' => $commande->delivery->address,
+                                ] : null,*/
 
                 // Litiges associés
                 'litiges' => $commande->litiges->map(function ($litige) {
@@ -114,7 +118,7 @@ class OrderController extends Controller
                 'date' => $commande->created_at,
                 'customer_image' => $commande->customer,
                 'customer_name' => $commande->customer ? $commande->customer->name : null,
-                'items' => $commande->products->map(fn ($item) => [
+                'items' => $commande->products->map(fn($item) => [
                     'id' => $item->id,
                     'amount' => $item->amount,
                     'order_id' => $item->commande_id,
@@ -122,7 +126,7 @@ class OrderController extends Controller
                     'product_price' => $item->product_price,
                     'quantity' => $item->quantity,
                 ]),
-                'litiges' => $commande->litiges->map(fn ($litige) => [
+                'litiges' => $commande->litiges->map(fn($litige) => [
                     'id' => $litige->id,
                     'motif' => $litige->motif,
                     'status' => $litige->status,
@@ -185,7 +189,27 @@ class OrderController extends Controller
                     'amount' => $prod['quantity'] * $product->price,
                 ]);
             }
-            Notification::route('mail', 'support@frps.com')->notify(new NewOrderNotification($commande));
+            $user = Auth::user();
+            $setting = Setting::query()->first();
+
+            if (!is_null($setting)) {
+                // 📧 Mail en queue
+                Notification::route('mail', $setting->notification_address)
+                    ->notify(new NewOrderNotification($commande));
+
+                // 📲 SMS à l’admin en queue
+                $admin = User::query()->firstWhere('phone', $setting->notification_phone);
+                $admin ?->notify(
+                    new SmsNotification("Une nouvelle commande a été créée par $user->first_name. Montant: $commande->total FCFA !")
+                );
+
+             // 📲 SMS au client en queue
+                $user->notify(
+                    new SmsNotification("Votre commande a été créée avec succès !")
+                );
+            }
+
+
             DB::commit();
 
             return Helpers::success([
@@ -260,8 +284,8 @@ class OrderController extends Controller
                     'id' => $item->id,
                     'amount' => $item->montant,
                     'order_id' => $item->commande_id,
-                    'method' => $item->stringMethode->value ,
-                    'status' => $item->etat ,
+                    'method' => $item->stringMethode->value,
+                    'status' => $item->etat,
                     'date' => $item->date_paiement,
                 ];
             }),
@@ -292,11 +316,11 @@ class OrderController extends Controller
             'description' => $request->description,
             'photos' => json_encode($photos),
             'status' => 'en_investigation',
-            'resolution_deadline'=>date('Y-m-d')
+            'resolution_deadline' => date('Y-m-d')
         ]);
-        $commande=Commande::find($request->order_id);
+        $commande = Commande::find($request->order_id);
         $commande->update([
-           'status'=>Helper::STATUSINVESTIGATION
+            'status' => Helper::STATUSINVESTIGATION
         ]);
 
         // Notifier le support
@@ -338,15 +362,16 @@ class OrderController extends Controller
             $returnRequest->photos = json_encode($paths);
             $returnRequest->save();
         }
-/*        $notification=\App\Models\Notification::create([
-            'type'=>\App\Models\Notification::ORDERTYPE,
-        ]);*/
+        /*        $notification=\App\Models\Notification::create([
+                    'type'=>\App\Models\Notification::ORDERTYPE,
+                ]);*/
         // Notification éventuelle (ex: support)
         Notification::route('mail', 'support@frps.com')
             ->notify(new ReturnOrderNotification($returnRequest));
 
         return Helpers::success($returnRequest, 'Demande de retour enregistrée avec succès.');
     }
+
     public function assignTransporteur(Request $request, $id)
     {
         $request->validate([
@@ -372,7 +397,7 @@ class OrderController extends Controller
     {
         $commande = Commande::findOrFail($id);
 
-        switch ($status){
+        switch ($status) {
             case 3:
                 Notification::route('mail', $commande->customer->email)->notify(new NewOrderNotification($commande));
             case 4:
@@ -407,17 +432,17 @@ class OrderController extends Controller
 
             // Création du paiement
             $paiement = Paiement::create([
-                'commande_id'   => $request->order_id,
-                'montant'       => $request->amount,
-                'methode'       => $request->methodPayment,
-                'etat'          => Helper::PAIEMENTETATCOMPLET,
+                'commande_id' => $request->order_id,
+                'montant' => $request->amount,
+                'methode' => $request->methodPayment,
+                'etat' => Helper::PAIEMENTETATCOMPLET,
                 'date_paiement' => date('Y-m-d')
             ]);
 
             // Mise à jour du montant restant
             $nouveauReste = $commande->rest_to_pay - $request->amount;
             $commande->update([
-                'status'      => Helper::STATUSPROCESSING,
+                'status' => Helper::STATUSPROCESSING,
                 'rest_to_pay' => max($nouveauReste, 0)
             ]);
 
@@ -482,6 +507,7 @@ class OrderController extends Controller
 
         return Helpers::success($items);
     }
+
     public function getReturns(Request $request)
     {
         $returns = ReturnRequest::with([
@@ -504,6 +530,7 @@ class OrderController extends Controller
 
         return Helpers::success($items);
     }
+
     public function traiterLitige(Request $request, $litigeId)
     {
         $litige = Litige::findOrFail($litigeId);
@@ -525,7 +552,7 @@ class OrderController extends Controller
         $litige->save();
 
         // Notification à l'utilisateur FOSA
-       // Notification::send($litige->commande->user, new LitigeTraiteNotification($litige));
+        // Notification::send($litige->commande->user, new LitigeTraiteNotification($litige));
 
         return response()->json(['message' => 'Litige traité avec succès']);
     }
