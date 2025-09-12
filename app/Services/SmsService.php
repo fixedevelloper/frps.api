@@ -10,6 +10,7 @@ class SmsService
 {
     public function sendSms( $to, $message): array
     {
+        \Log::info("📲 SMS envoyé à {$to} : {$message}");
         $data = [
             "user" => env('API_SMS_USER'),
             "password" => env('API_SMS_PASSWORD'),
@@ -19,7 +20,7 @@ class SmsService
         ];
         $response = Http::withToken(env('API_SMS_TOKEN'))
             ->post(env('API_SMS_URL'), $data);
-
+        logger('--response'.json_encode($response));
         return $response->json();
     }
 }

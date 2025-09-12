@@ -8,21 +8,20 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class NewOrderNotification extends Notification
+
+class NewOrderNotification extends Notification implements ShouldQueue
 {
     use Queueable;
-    public $issue;
 
-    public function __construct(Commande $issue)
+    public $commande;
+
+    public function __construct(Commande $commande)
     {
-        $this->issue = $issue;
+        $this->commande = $commande;
     }
-
 
     /**
      * Get the notification's delivery channels.
-     *
-     * @return array<int, string>
      */
     public function via(object $notifiable): array
     {
@@ -34,18 +33,23 @@ class NewOrderNotification extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)->markdown('mail.new-order-notification');
+        return (new MailMessage)
+            ->subject("Nouvelle commande n°{$this->commande->id}")
+            ->markdown('mail.new-order-notification', [
+                'admin_name' => 'Administrateur',
+                'commande' => $this->commande,
+            ]);
     }
 
     /**
      * Get the array representation of the notification.
-     *
-     * @return array<string, mixed>
      */
     public function toArray(object $notifiable): array
     {
         return [
-            //
+            'commande_id' => $this->commande->id,
+            'total' => $this->commande->total,
         ];
     }
 }
+

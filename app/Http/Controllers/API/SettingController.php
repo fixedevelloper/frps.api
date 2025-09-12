@@ -12,6 +12,7 @@ use App\Models\Departement;
 use App\Models\Image;
 use App\Models\Litige;
 use App\Models\Notification;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -118,5 +119,62 @@ class SettingController extends Controller
             $category->save();
         }
         return Helpers::success($category,'Agent enregistré');
+    }
+
+    // Retourne l'unique Setting
+    public function show()
+    {
+        $setting = Setting::first(); // on suppose qu’il y en a un seul
+        return Helpers::success($setting,'Agent enregistré');
+    }
+
+    // Met à jour l'unique Setting
+
+        public function update(Request $request)
+    {
+        $setting = Setting::first(); // on suppose qu'il n'y a qu'une seule ligne
+
+        if (!$setting) {
+            return response()->json(['message' => 'Paramètres non trouvés'], 404);
+        }
+        logger($request->all());
+        logger(array_map('strlen', $request->all())); // longueur des champs
+        // validation optionnelle
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:50',
+            'email' => 'nullable|email|max:255',
+            'address' => 'nullable|string|max:255',
+            'logo' => 'nullable|image|max:2048',
+            'stock_alert' => 'nullable|numeric',
+            'notification_address' => 'nullable|email',
+            'notification_phone' => 'nullable|string',
+            'dateline_litige' => 'nullable|numeric',
+            'percent_payable' => 'nullable|numeric',
+        ]);
+
+        // mettre à jour les champs simples
+        $fields = [
+            'name', 'phone', 'email', 'address', 'stock_alert',
+            'notification_address', 'notification_phone',
+            'dateline_litige', 'percent_payable'
+        ];
+
+        foreach ($fields as $field) {
+            if ($request->has($field)) {
+                $setting->$field = $request->input($field);
+            }
+        }
+
+        // gérer le logo
+        if ($request->hasFile('logo')) {
+            $file = $request->file('logo');
+            $path = $file->store('logos', 'public'); // stockage dans storage/app/public/logos
+            $setting->logo = '/storage/' . $path;
+        }
+
+        $setting->save();
+
+        return Helpers::success($setting,'Agent enregistré');
     }
 }

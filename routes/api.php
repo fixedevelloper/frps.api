@@ -47,7 +47,8 @@ Route::middleware(['jwt.verify','jwt.auth'])->group(function () {
     Route::get('customers', [SettingController::class, 'getCustomers']);
     Route::get('agents', [SettingController::class, 'getAgents']);
     Route::post('agents', [SettingController::class, 'storeAgent']);
-
+    Route::get('/settings', [SettingController::class, 'show']);
+    Route::post('/settings', [SettingController::class, 'update']);
     Route::put('/livraisons/{id}/expedier', [LivraisonController::class, 'marquerExpedie']);
     Route::put('/livraisons/{id}/confirmer', [LivraisonController::class, 'confirmerReception']);
     Route::post('/livraisons/{id}/probleme', [LivraisonController::class, 'signalerProbleme']);
