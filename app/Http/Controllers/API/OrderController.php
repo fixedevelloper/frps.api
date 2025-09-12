@@ -122,9 +122,9 @@ class OrderController extends Controller
                     'id' => $item->id,
                     'amount' => $item->amount,
                     'order_id' => $item->commande_id,
-                    'product' => $item->product_name ?? 'N/A',
-                    'product_price' => $item->product_price,
-                    'quantity' => $item->quantity,
+                    'product' => $item->product->intitule ?? 'N/A',
+                    'product_price' => $item->product->amount,
+                    'quantity' => $item->quantite,
                 ]),
                 'litiges' => $commande->litiges->map(fn($litige) => [
                     'id' => $litige->id,
