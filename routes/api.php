@@ -5,6 +5,7 @@ use App\Http\Controllers\API\CustomerController;
 use App\Http\Controllers\API\JWTAuthController;
 use App\Http\Controllers\API\LivraisonController;
 use App\Http\Controllers\API\OrderController;
+use App\Http\Controllers\API\PasswordController;
 use App\Http\Controllers\API\SettingController;
 use App\Http\Controllers\API\TransporteurController;
 use Illuminate\Http\Request;
@@ -15,9 +16,14 @@ use App\Http\Middleware\JwtMiddleware;
 Route::post('register', [JWTAuthController::class, 'register']);
 Route::post('login', [JWTAuthController::class, 'loginCustomer']);
 Route::post('login_admin', [JWTAuthController::class, 'login']);
+Route::post('/password/forgot', [PasswordController::class, 'sendResetLinkEmail']);
+Route::post('/password/reset', [PasswordController::class, 'reset']);
+Route::get('/email/verify/{id}', [PasswordController::class, 'verify'])
+    ->name('verification.verify')
+    ->middleware('signed'); // important pour valider la signature
 Route::get('departements', [SettingController::class, 'departements']);
 Route::get('cities/{departement_id}', [SettingController::class, 'cities']);
-Route::middleware(['jwt.verify','jwt.auth'])->group(function () {
+Route::middleware(['jwt.verify','jwt.auth','verified'])->group(function () {
     Route::get('user', [JWTAuthController::class, 'getUser']);
     Route::post('logout', [JWTAuthController::class, 'logout']);
     Route::post('stocks', [CatalogueController::class, 'updateStock']);

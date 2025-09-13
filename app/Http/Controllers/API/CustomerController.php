@@ -11,7 +11,7 @@ use App\Models\Litige;
 use App\Models\Paiement;
 use App\Models\Product;
 use App\Models\ReturnRequest;
-use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -125,7 +125,7 @@ class CustomerController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|min:3',
-            'email' => 'required|email|unique:clients,email,' . $client->id,
+            'email' => 'required|email|unique:users,email,' . $client->id,
             'phone' => 'required|string',
             'departement_id' => 'required|integer',
             'city_id' => 'required|integer',

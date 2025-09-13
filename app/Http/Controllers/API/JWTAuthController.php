@@ -6,9 +6,13 @@ namespace App\Http\Controllers\API;
 
 use App\Helpers\api\Helpers;
 use App\Http\Controllers\Controller;
+use App\Mail\VerifyEmailMail;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
@@ -40,12 +44,20 @@ class JWTAuthController extends Controller
             'user_type'=>User::CUSTOMER_TYPE
         ]);
 
-        $token = JWTAuth::fromUser($user);
+        // Générer une URL signée valable 24h
+        $temporarySignedUrl = URL::temporarySignedRoute(
+            'verification.verify', // nom de la route backend
+            Carbon::now()->addHours(24),
+            ['id' => $user->id]
+        );
 
+        // Créer l’URL front Angular
+        $url = config('app.frontend.url') . '/auth/verify-email?url=' . urlencode($temporarySignedUrl);
+
+        // Envoi du mail
+        Mail::to($user->email)->send(new VerifyEmailMail($url));
         return Helpers::success([
-            'token'=>$token,
-            'phone'=>$user->phone,
-            'username'=>$user->name
+
         ]);
     }
 
@@ -64,10 +76,15 @@ class JWTAuthController extends Controller
             if (($user->user_type != User::CUSTOMER_TYPE)) {
                 return Helpers::unauthorized(401,'Utilisateur non trouvé');
             }
+            if (!$user->hasVerifiedEmail()) {
+                return Helpers::unauthorized(401, 'Votre email n\'est pas encore vérifié');
+            }
+
             // (optional) Attach the role to the token.
             $token = JWTAuth::claims(['role' => $user->role])->fromUser($user);
 
             return Helpers::success([
+                'message'=>'Compte créé avec succès. Vérifiez votre email pour activer le compte',
                 'token'=>$token,
                 'phone'=>$user->phone,
                 'username'=>$user->name
@@ -95,6 +112,7 @@ class JWTAuthController extends Controller
             $token = JWTAuth::claims(['role' => $user->role])->fromUser($user);
 
             return Helpers::success([
+
                 'token'=>$token,
                 'phone'=>$user->phone,
                 'username'=>$user->name

@@ -32,7 +32,7 @@
 
     **Montant Total :** {{ number_format($commande->total, 0, ',', ' ') }} FCFA
 
-    <x-mail::button :url="'https://app.monsite.com/admin/orders/' . $commande->id">
+    <x-mail::button :url="'https://client.frps-ad.cm/orders/' . $commande->id">
         Voir la commande
     </x-mail::button>
 

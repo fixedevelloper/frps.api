@@ -16,7 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
       $middleware->alias([
           'jwt.verify' => \App\Http\Middleware\JwtMiddleware::class,
-
+          'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
       ]);
 })
     ->withExceptions(function (Exceptions $exceptions): void {
