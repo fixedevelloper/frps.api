@@ -10,6 +10,7 @@ use App\Mail\VerifyEmailMail;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
@@ -19,13 +20,65 @@ use Tymon\JWTAuth\Exceptions\JWTException;
 
 class JWTAuthController extends Controller
 {
-    // User registration
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'city_id' => 'required|integer|max:255',
-            'phone' => 'required|string|max:255',
+            'phone' => 'required|string|max:9',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return Helpers::error($validator->errors()->toJson());
+        }
+
+        try {
+            // Transaction uniquement pour la création utilisateur
+            DB::beginTransaction();
+
+            $user = User::create([
+                'name' => $request->get('name'),
+                'city_id' => $request->get('city_id'),
+                'departement_id' => $request->get('departement_id'),
+                'email' => $request->get('email'),
+                'phone' => $request->get('phone'),
+                'password' => Hash::make($request->get('password')),
+                'user_type' => User::CUSTOMER_TYPE
+            ]);
+
+            DB::commit();
+
+            // Générer l’URL signée
+            $temporarySignedUrl = URL::temporarySignedRoute(
+                'verification.verify',
+                Carbon::now()->addHours(24),
+                ['id' => $user->id]
+            );
+
+            $url = config('app.frontend.url') . '/auth/verify-email?url=' . urlencode($temporarySignedUrl);
+
+            // Envoi du mail en queue (asynchrone)
+            Mail::to($user->email)->send(new VerifyEmailMail($url));
+
+            return Helpers::success([
+                'message' => 'Utilisateur créé avec succès. Un email de vérification a été envoyé.'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return Helpers::error('Erreur lors de l\'inscription : ' . $e->getMessage());
+        }
+    }
+
+    // User registration
+    public function register2(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'city_id' => 'required|integer|max:255',
+            'phone' => 'required|string|max:9',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:6|confirmed',
         ]);
