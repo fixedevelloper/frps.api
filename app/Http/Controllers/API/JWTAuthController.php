@@ -49,7 +49,7 @@ class JWTAuthController extends Controller
             ]);
             $user->email_verified_at = now();
             $user->save();
-            DB::commit();
+
 
             // Générer l’URL signée
             $temporarySignedUrl = URL::temporarySignedRoute(
@@ -61,8 +61,8 @@ class JWTAuthController extends Controller
             $url = config('app.frontend.url') . '/auth/verify-email?url=' . urlencode($temporarySignedUrl);
 
             // Envoi du mail en queue (asynchrone)
-            Mail::to($user->email)->queue(new VerifyEmailMail($url));
-
+            Mail::to($user->email)->send(new VerifyEmailMail($url));
+            DB::commit();
             return Helpers::success([
                 'message' => 'Utilisateur créé avec succès. Un email de vérification a été envoyé.'
             ]);

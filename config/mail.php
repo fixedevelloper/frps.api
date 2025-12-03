@@ -14,7 +14,7 @@ return [
     |
     */
 
-    'default' => env('MAIL_MAILER', 'log'),
+    'default' => env('MAIL_MAILER', 'mailjet'),
 
     /*
     |--------------------------------------------------------------------------
@@ -95,6 +95,9 @@ return [
                 'postmark',
             ],
             'retry_after' => 60,
+        ],
+        'mailjet' => [
+            'transport' => 'mailjet',
         ],
 
     ],
