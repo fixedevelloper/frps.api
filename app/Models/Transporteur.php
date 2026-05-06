@@ -20,7 +20,8 @@ class Transporteur extends Model
 
     public function transporteurInterne()
     {
-        return $this->hasOne(TransporteurInterne::class);
+        return $this->hasOne(TransporteurInterne::class)
+            ->with(['vehicule','chauffeur']);
     }
 
     public function commandes(): HasMany

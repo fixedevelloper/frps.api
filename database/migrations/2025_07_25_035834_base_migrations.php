@@ -96,7 +96,7 @@ return new class extends Migration
             $table->string('facture_pdf')->nullable();
             $table->string('bordereau_pdf')->nullable();
             $table->integer('validatedBy')->nullable()->comment('0:System');
-           $table->tinyInteger('status')->default(Helper::STATUSPENDING);
+            $table->tinyInteger('status')->default(Helper::STATUSPENDING);
             $table->tinyInteger('validatedStatus')->default(Helper::STATUSPENDING);
             $table->timestamps();
         });
@@ -138,17 +138,49 @@ return new class extends Migration
             $table->timestamps();
         });
         Schema::create('litiges', function (Blueprint $table) {
+
             $table->id();
-            $table->foreignId('commande_id')->constrained();
-            $table->enum('type',['retard','colis_endommage','non_conformite','produit_defectueux','erreur_livraison','quantite_incorrecte']); // retard, colis endommagé, etc.
-            $table->text('description')->nullable()->comment('Description du problème');
-            $table->enum('status',['en_investigation','accepte','refuse','archive'])->default('en_investigation');
-            $table->date('submitted_at')->nullable(); //Date de soumission
-            $table->date('resolution_deadline');//Délai max de traitement
-            $table->json('photos')->nullable();
+
+            $table->foreignId('commande_id')->constrained()->cascadeOnDelete();
+
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+
+            $table->enum('type',['retard','colis_endommage','non_conformite','produit_defectueux','erreur_livraison','quantite_incorrecte']);
+
+            $table->string('status')->default('pending');
+
+            $table->text('description');
+
+            $table->timestamp('submitted_at')->nullable();
+
+            $table->timestamp('resolution_deadline')->nullable();
+
+            $table->timestamp('resolved_at')->nullable();
+
+            $table->decimal('refund_amount',10,2)->nullable();
+
+            $table->text('admin_comment')->nullable();
+
             $table->timestamps();
         });
+        Schema::create('litige_messages', function (Blueprint $table) {
 
+            $table->id();
+
+            $table->foreignId('litige_id')
+                ->constrained()
+                ->cascadeOnDelete();
+
+            $table->foreignId('user_id')
+                ->constrained()
+                ->cascadeOnDelete();
+            $table->string('type');
+            $table->text('message');
+
+            $table->json('attachments')->nullable();
+
+            $table->timestamps();
+        });
         Schema::create('return_requests', function (Blueprint $table) {
             $table->id();
             $table->foreignId('commande_id')->constrained();
@@ -192,6 +224,54 @@ return new class extends Migration
             $table->foreignId('from_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('to_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
+        });
+        // Table transporteurs
+        Schema::create('transporteurs', function (Blueprint $table) {
+            $table->id();
+            $table->string('nom');
+            $table->enum('type', ['interne', 'externe']);
+            $table->timestamps();
+        });
+
+        // Table transporteur_externes
+        Schema::create('transporteur_externes', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('transporteur_id')->constrained('transporteurs')->onDelete('cascade');
+            $table->string('contrat');
+            $table->decimal('cout', 10, 2);
+            $table->integer('delai'); // en heures ou jours
+            $table->timestamps();
+        });
+
+        // Table véhicules
+        Schema::create('vehicules', function (Blueprint $table) {
+            $table->id();
+            $table->string('immatriculation')->unique();
+            $table->string('modele');
+            $table->decimal('capacite', 10, 2); // en kg ou tonnes
+            $table->timestamps();
+        });
+
+
+        // Table transporteur_internes
+        Schema::create('transporteur_internes', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('transporteur_id')->constrained('transporteurs')->onDelete('cascade');
+            $table->foreignId('vehicule_id')->constrained('vehicules')->onDelete('cascade');
+            $table->foreignId('chauffeur_id')->constrained('users')->onDelete('cascade');
+            $table->timestamps();
+        });
+
+        // Modifier transporteur_id dans commandes
+        Schema::table('commandes', function (Blueprint $table) {
+            if (!Schema::hasColumn('commandes', 'transporteur_id')) {
+                $table->foreignId('transporteur_id')->nullable()->constrained('transporteurs')->onDelete('set null');
+            }
+        });
+        Schema::table('paiements', function (Blueprint $table) {
+            $table->json('provider_response')->after('methode')->nullable();
+            $table->string('reference')->after('methode')->nullable();
+            $table->enum('status', ['pending','processing', 'paid', 'failed'])->after('methode')->default('pending');
         });
     }
 

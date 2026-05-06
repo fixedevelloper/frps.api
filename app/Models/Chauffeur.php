@@ -19,4 +19,8 @@ class Chauffeur extends Model
     {
         return $this->hasMany(Commande::class);
     }
+    public function scopeActifs($query)
+    {
+        return $query->where('actif', true);
+    }
 }

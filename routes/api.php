@@ -2,12 +2,15 @@
 
 use App\Http\Controllers\API\CatalogueController;
 use App\Http\Controllers\API\CustomerController;
+use App\Http\Controllers\API\DashboardController;
 use App\Http\Controllers\API\JWTAuthController;
+use App\Http\Controllers\API\LitigeMessageController;
 use App\Http\Controllers\API\LivraisonController;
 use App\Http\Controllers\API\OrderController;
 use App\Http\Controllers\API\PasswordController;
 use App\Http\Controllers\API\SettingController;
 use App\Http\Controllers\API\TransporteurController;
+use App\Http\Controllers\API\LitigeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -23,7 +26,7 @@ Route::get('/email/verify/{id}', [PasswordController::class, 'verify'])
     ->middleware('signed'); // important pour valider la signature
 Route::get('departements', [SettingController::class, 'departements']);
 Route::get('cities/{departement_id}', [SettingController::class, 'cities']);
-Route::middleware(['jwt.verify','jwt.auth','verified'])->group(function () {
+Route::middleware(['jwt.verify', 'jwt.auth', 'verified'])->group(function () {
     Route::get('user', [JWTAuthController::class, 'getUser']);
     Route::post('logout', [JWTAuthController::class, 'logout']);
     Route::post('stocks', [CatalogueController::class, 'updateStock']);
@@ -42,11 +45,12 @@ Route::middleware(['jwt.verify','jwt.auth','verified'])->group(function () {
     Route::get('orders/customer', [OrderController::class, 'ordersCustomer']);
     Route::get('orders', [OrderController::class, 'orders']);
     Route::get('orders/{id}', [OrderController::class, 'orderDetail']);
-    Route::post('litiges', [OrderController::class, 'storeLitige']);
+   // Route::post('litiges', [OrderController::class, 'storeLitige']);
     Route::post('returns', [OrderController::class, 'storeReturn']);
-    Route::get('litiges', [OrderController::class, 'getLitiges']);
+    //Route::get('litiges', [OrderController::class, 'getLitiges']);
     Route::get('returns', [OrderController::class, 'getReturns']);
-    Route::get('litiges/customer', [CustomerController::class, 'getLitiges']);
+    Route::get('litiges/customer', [LitigeController::class, 'getLitiges']);
+    Route::apiResource('litiges', LitigeController::class);
     Route::get('returns/customer', [CustomerController::class, 'getReturns']);
     Route::get('orders/{id}/{status}/status', [OrderController::class, 'changeStatus']);
     Route::post('paiements', [OrderController::class, 'paiementFacture']);
@@ -72,5 +76,10 @@ Route::middleware(['jwt.verify','jwt.auth','verified'])->group(function () {
     Route::get('/transporteurs/{id}', [TransporteurController::class, 'show']);
 
     Route::get('notifications', [SettingController::class, 'notifications']);
-
+    Route::post('/litiges/messages', [LitigeMessageController::class, 'store']);
+    Route::get('/litiges/{litigeId}/messages', [LitigeMessageController::class, 'getMessages']);
+    Route::get('/dashboard/sales-chart', [DashboardController::class, 'salesChart']);
+    Route::get('/dashboard/last-orders', [DashboardController::class, 'lastOrders']);
+    Route::get('/dashboard/statistics', [DashboardController::class, 'getStatistics']);
+    Route::get('/dashboard/sale-days-chart', [DashboardController::class, 'salesWeekChart']);
 });

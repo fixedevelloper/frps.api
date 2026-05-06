@@ -23,79 +23,101 @@ use App\Notifications\ProformaGenerated;
 use App\Notifications\ReturnOrderNotification;
 use App\Notifications\SmsNotification;
 use App\Services\PdfService;
+use App\Services\TransactService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
     private $pdfService;
-
+    protected $tranzakService;
     /**
      * OrderController constructor.
      * @param $pdfService
      */
-    public function __construct(PdfService $pdfService)
+    public function __construct(PdfService $pdfService,TransactService $tranzakService)
     {
         $this->pdfService = $pdfService;
+        $this->tranzakService=$tranzakService;
     }
 
     public function ordersCustomer(Request $request)
     {
-        $commandes = Commande::with([
-            'customer',
-            'products',
-            'litiges'
-        ])->where('customer_id', auth()->id())->get();
+        // Récupérer la page et la taille depuis la requête
+        $perPage = $request->query('per_page', 10); // par défaut 10 commandes par page
+        $page = $request->query('page', 1);
 
-        $orders = $commandes->map(function ($commande) {
+        // Requête avec pagination
+        $query = Commande::with([
+            'customer.image',
+            'products',
+            'litiges',
+        ])->where('customer_id', auth()->id())
+            ->orderBy('created_at', 'desc'); // dernières commandes en premier
+
+        $commandes = $query->paginate($perPage, ['*'], 'page', $page);
+
+        // Transformer les données
+        $orders = $commandes->getCollection()->transform(function ($commande) {
             return [
                 'id' => $commande->id,
+                'reference' => $commande->reference,
                 'total' => $commande->total,
                 'status' => $commande->stringStatus->value,
                 'validatedStatus' => $commande->stringValidatedStatus->value,
                 'date' => $commande->created_at,
-                'customer_image' => $commande->customer->image ? $commande->customer->image->src : null,
-                'customer_name' => $commande->customer
-                    ? $commande->customer->name
-                    : null,
+                'customer_image' => $commande->customer->image?->src,
+            'customer_name' => $commande->customer?->name,
 
-                // Produits commandés
-                'items' => $commande->products->map(function ($item) {
-                    return [
-                        'id' => $item->id,
-                        'amount' => $item->amount,
-                        'order_id' => $item->commande_id,
-                        'product' => $item->product_name ?? 'N/A', // adapte si relation
-                        'product_price' => $item->product_price,
-                        'quantity' => $item->quantity,
-                    ];
-                }),
+            // Produits commandés
+            'items' => $commande->products->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'amount' => $item->amount,
+                    'order_id' => $item->commande_id,
+                    'product' => $item->product_name ?? 'N/A',
+                    'product_price' => $item->product_price,
+                    'quantity' => $item->quantity,
+                ];
+            }),
 
-                // Informations de livraison
-                /*                'delivery' => $commande->delivery ? [
-                                    'id' => $commande->delivery->id,
-                                    'status' => $commande->delivery->status,
-                                    'delivered_at' => $commande->delivery->delivered_at,
-                                    'address' => $commande->delivery->address,
-                                ] : null,*/
+            // Informations de livraison
+/*            'delivery' => $commande->delivery ? [
+                'id' => $commande->delivery->id,
+                'status' => $commande->delivery->status,
+                'delivered_at' => $commande->delivery->delivered_at,
+                'address' => $commande->delivery->address,
+            ] : null,*/
 
-                // Litiges associés
-                'litiges' => $commande->litiges->map(function ($litige) {
-                    return [
-                        'id' => $litige->id,
-                        'motif' => $litige->motif,
-                        'status' => $litige->status,
-                        'commentaire' => $litige->commentaire,
-                        'created_at' => $litige->created_at,
-                    ];
-                }),
-            ];
-        });
+            // Litiges associés
+            'litiges' => $commande->litiges->map(function ($litige) {
+                return [
+                    'id' => $litige->id,
+                    'motif' => $litige->motif,
+                    'status' => $litige->status,
+                    'commentaire' => $litige->commentaire,
+                    'created_at' => $litige->created_at,
+                ];
+            }),
+        ];
+    });
 
-        return Helpers::success($orders);
+        // Retourner la pagination complète avec les données
+        return Helpers::success([
+            'data' => $orders,
+            'pagination' => [
+                'current_page' => $commandes->currentPage(),
+                'per_page' => $commandes->perPage(),
+                'total' => $commandes->total(),
+                'last_page' => $commandes->lastPage(),
+            ],
+        ]);
     }
 
 
@@ -238,6 +260,7 @@ class OrderController extends Controller
 
         $order = [
             'id' => $commande->id,
+            'reference' => $commande->reference,
             'total' => $commande->total,
             'status' => $commande->stringStatus->value,
             'statusValue' => $commande->status,
@@ -285,7 +308,7 @@ class OrderController extends Controller
                     'amount' => $item->montant,
                     'order_id' => $item->commande_id,
                     'method' => $item->stringMethode->value,
-                    'status' => $item->etat,
+                    'status' => $item->status,
                     'date' => $item->date_paiement,
                 ];
             }),
@@ -401,7 +424,8 @@ class OrderController extends Controller
             case 3:
                 Notification::route('mail', $commande->customer->email)->notify(new NewOrderNotification($commande));
             case 4:
-                $this->pdfService->generateProformat($commande);
+                $this->generateProformat($commande);
+                //$this->pdfService->generateProformat($commande);
                 if ($commande->customer && $commande->customer->email) {
                     $commande->customer->notify(new ProformaGenerated($commande));
                 }
@@ -429,12 +453,25 @@ class OrderController extends Controller
             if ($totalPayeAvant + $request->amount > $commande->total) {
                 return Helpers::error("Le montant payé dépasse le total de la commande.");
             }
+            // 5️⃣ référence paiement
+            $reference = 'FRPS-' . Str::upper(Str::random(10));
 
+            // 6️⃣ appel paiement
+            $response = $this->tranzakService->makeColletion([
+                'amount' => $request->amount,
+                'reference' => $reference,
+                'success_url' => url('/payment/success'),
+                'cancel_url' => url('/payment/cancel'),
+                'callback_url' => url('/tranzak/webhook'),
+                'description' => 'Paiement produits FRPS'
+            ]);
             // Création du paiement
             $paiement = Paiement::create([
+                'reference' => $response['data']['requestId'],
                 'commande_id' => $request->order_id,
                 'montant' => $request->amount,
                 'methode' => $request->methodPayment,
+                'status' => 'pending',
                 'etat' => Helper::PAIEMENTETATCOMPLET,
                 'date_paiement' => date('Y-m-d')
             ]);
@@ -448,12 +485,16 @@ class OrderController extends Controller
 
             // Générer bordereau seulement au premier paiement
             if ($totalPayeAvant == 0) {
-                $this->pdfService->generateBordereau($commande);
+                $this->generateBordereau($commande);
+               // $this->pdfService->generateBordereau($commande);
             }
 
             DB::commit();
 
-            return Helpers::success($commande);
+            return Helpers::success([
+                'success' => true,
+                'url' => $response['data']['links']['paymentAuthUrl']
+            ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -485,50 +526,46 @@ class OrderController extends Controller
         return Helpers::success($orders);
     }
 
-    public function getLitiges(Request $request)
-    {
-        $litiges = Litige::with([
-            'customer',
-        ])->get();
 
-        $items = $litiges->map(function ($payment) {
-            return [
-                'id' => $payment->id,
-                'order_id' => $payment->commande->id,
-                'montant' => $payment->montant,
-                'status' => $payment->stringStatus->value,
-                'date' => $payment->created_at,
-                'customer_image' => $payment->commande->customer->image ? $payment->commande->customer->image->src : null,
-                'customer_name' => $payment->commande->customer
-                    ? $payment->commande->customer->name
-                    : null,
-            ];
-        });
-
-        return Helpers::success($items);
-    }
 
     public function getReturns(Request $request)
     {
+        $perPage = $request->get('per_page', 10);
+
         $returns = ReturnRequest::with([
-            'customer',
-        ])->get();
+            'commande.customer.image',
+            'productOrder','productOrder.product'
+        ])->latest()->paginate($perPage);
 
-        $items = $returns->map(function ($payment) {
-            return [
-                'id' => $payment->id,
-                'order_id' => $payment->commande->id,
-                'montant' => $payment->montant,
-                'status' => $payment->stringStatus->value,
-                'date' => $payment->created_at,
-                'customer_image' => $payment->commande->customer->image ? $payment->commande->customer->image->src : null,
-                'customer_name' => $payment->commande->customer
-                    ? $payment->commande->customer->name
-                    : null,
-            ];
-        });
+        $items = $returns->getCollection()->map(function ($returnRequest) {
 
-        return Helpers::success($items);
+            $customer = $returnRequest->commande?->customer;
+
+        return [
+            'id' => $returnRequest->id,
+            'order_id' => $returnRequest->commande?->id,
+            'product_order_id' => $returnRequest->product_order_id,
+
+            'reason' => $returnRequest->reason,
+            'status' => $returnRequest->status,
+
+            'date_demande' => $returnRequest->date_demande,
+            'date_traitement' => $returnRequest->date_traitement,
+           'product' => $returnRequest->productOrder->product,
+            'customer_image' => $customer?->image?->src,
+            'customer_name' => $customer?->name,
+        ];
+    });
+
+        return Helpers::success([
+            'data' => $items,
+            'pagination' => [
+                'current_page' => $returns->currentPage(),
+                'last_page' => $returns->lastPage(),
+                'per_page' => $returns->perPage(),
+                'total' => $returns->total(),
+            ]
+        ]);
     }
 
     public function traiterLitige(Request $request, $litigeId)
@@ -555,6 +592,77 @@ class OrderController extends Controller
         // Notification::send($litige->commande->user, new LitigeTraiteNotification($litige));
 
         return response()->json(['message' => 'Litige traité avec succès']);
+    }
+    public function generateProformat($commande)
+    {
+        $directory = public_path('proformas');
+
+        if (!File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        $filename = "proforma_commande_{$commande->id}_" . time() . ".pdf";
+        $fullPath = $directory . '/' . $filename;
+
+        $pdf = Pdf::loadView('pdf.proforma', [
+            'commande' => $commande
+        ])->setPaper('A4', 'portrait');
+
+        $pdf->save($fullPath);
+
+        // Sauvegarde du lien en base
+        $commande->update([
+            'proforma_pdf' => 'proformas/' . $filename
+        ]);
+
+        return $fullPath;
+    }
+    public function generateBordereau($commande)
+    {
+        $directory = public_path('bordereaux');
+
+        if (!File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        $filename = "bordereau_commande_{$commande->id}_" . time() . ".pdf";
+        $fullPath = $directory . '/' . $filename;
+
+        $pdf = Pdf::loadView('pdf.bordereau', [
+            'commande' => $commande
+        ])->setPaper('A4', 'portrait');
+
+        $pdf->save($fullPath);
+
+        $commande->update([
+            'bordereau_pdf' => 'bordereaux/' . $filename
+        ]);
+
+        return $fullPath;
+    }
+    public function generateFacture($commande, $avecTVA = false)
+    {
+        $directory = public_path('factures');
+
+        if (!File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        $filename = "facture_{$commande->id}_" . time() . ".pdf";
+        $fullPath = $directory . '/' . $filename;
+
+        $pdf = Pdf::loadView('pdf.facture', [
+            'commande' => $commande,
+            'avecTVA' => $avecTVA
+        ])->setPaper('A4', 'portrait');
+
+        $pdf->save($fullPath);
+
+        $commande->update([
+            'facture_pdf' => 'factures/' . $filename
+        ]);
+
+        return $fullPath;
     }
 
 }

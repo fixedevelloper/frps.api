@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\TranzakWebhookController;
 use App\Mail\TestMail;
 use App\Mail\VerifyEmailMail;
 use Illuminate\Support\Facades\Route;
@@ -43,3 +45,6 @@ Route::get('/test-mailjet-api', function () {
         "data" => $response->getData(),
     ];
 });
+Route::get('/payment/success', [PaymentController::class, 'success']);
+Route::get('/payment/cancel', [PaymentController::class, 'failed']);
+Route::post('/tranzak/webhook', [TranzakWebhookController::class, 'handle']);

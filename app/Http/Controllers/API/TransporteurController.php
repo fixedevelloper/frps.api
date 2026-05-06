@@ -117,7 +117,11 @@ class TransporteurController extends Controller
     }
     public function show($id)
     {
-        $transporteur = Transporteur::with(['transporteurExterne', 'transporteurInterne'])->findOrFail($id);
+        $transporteur = Transporteur::with([
+            'transporteurExterne',
+            'transporteurInterne.vehicule',
+            'transporteurInterne.chauffeur'
+        ])->findOrFail($id);
 
         return Helpers::success($transporteur);
     }

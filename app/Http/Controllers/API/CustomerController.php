@@ -20,47 +20,73 @@ class CustomerController extends Controller
 
     public function getLitiges(Request $request)
     {
-        $litiges = Litige::with([
-            'customer',
-        ])->leftJoin('litiges.commande_id','commandes.id')->leftJoin('commandes.customer_id','users.id')->where('commandes.customer_id', auth()->id())->get();
+        $litiges = Litige::with('commande.customer.image')
+            ->whereHas('commande', fn($q) => $q->where('customer_id', auth()->id()))
+            ->latest()
+            ->paginate(10);
 
-        $items = $litiges->map(function ($payment) {
-            return [
-                'id' => $payment->id,
-                'order_id' => $payment->commande->id,
-                'montant' => $payment->montant,
-                'status' => $payment->stringStatus->value,
-                'date' => $payment->created_at,
-                'customer_image' => $payment->commande->customer->image ? $payment->commande->customer->image->src : null,
-                'customer_name' => $payment->commande->customer
-                    ? $payment->commande->customer->name
-                    : null,
-            ];
-        });
+        $items = $litiges->map(function ($litige) {
+
+            $customer = $litige->commande?->customer;
+
+        return [
+            'id' => $litige->id,
+            'order_id' => $litige->commande?->id,
+            'type' => $litige->type,
+            'description' => $litige->description,
+
+            'status' => $litige->stringStatus->value,
+            'status_class' => $litige->stringStatus->class,
+
+            'submitted_at' => $litige->submitted_at,
+
+            'customer_image' => $customer?->image?->src,
+            'customer_name' => $customer?->name,
+        ];
+    });
 
         return Helpers::success($items);
     }
     public function getReturns(Request $request)
     {
+        $perPage = $request->get('per_page', 10);
+
         $returns = ReturnRequest::with([
-            'customer',
-        ])->where('customer_id', auth()->id())->get();
+            'commande.customer.image','productOrder.product'
+        ])
+            ->whereHas('commande', function ($q) {
+                $q->where('customer_id', auth()->id());
+            })
+            ->latest()
+            ->paginate($perPage);
 
-        $items = $returns->map(function ($payment) {
-            return [
-                'id' => $payment->id,
-                'order_id' => $payment->commande->id,
-                'montant' => $payment->montant,
-                'status' => $payment->stringStatus->value,
-                'date' => $payment->created_at,
-                'customer_image' => $payment->commande->customer->image ? $payment->commande->customer->image->src : null,
-                'customer_name' => $payment->commande->customer
-                    ? $payment->commande->customer->name
-                    : null,
-            ];
-        });
+        $items = $returns->getCollection()->map(function ($return) {
 
-        return Helpers::success($items);
+            $customer = $return->commande?->customer;
+
+        return [
+            'id' => $return->id,
+            'order_id' => $return->commande?->id,
+            'reason' => $return->reason,
+            'status' => $return->status,
+            'product' => $return->productOrder->product,
+            'date_demande' => $return->date_demande,
+            'date_traitement' => $return->date_traitement,
+
+            'customer_image' => $customer?->image?->src,
+            'customer_name' => $customer?->name,
+        ];
+    });
+
+        return Helpers::success([
+            'data' => $items,
+            'pagination' => [
+                'current_page' => $returns->currentPage(),
+                'last_page' => $returns->lastPage(),
+                'per_page' => $returns->perPage(),
+                'total' => $returns->total(),
+            ]
+        ]);
     }
     public function index(Request $request)
     {

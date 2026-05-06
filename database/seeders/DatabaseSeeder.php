@@ -17,7 +17,8 @@ class DatabaseSeeder extends Seeder
        User::factory()->create([
             'name' => 'Super Admin',
             'email' => 'admin@localhost.com',
-            'phone' => '675066919',
+            'phone' => '650000000',
+           'password' => '123456789',
             'user_type'=>0
         ]);
         Setting::create([
@@ -30,11 +31,11 @@ class DatabaseSeeder extends Seeder
             'notification_phone' => '237675066919',
         ]);
         $this->call([
-            //ImageSeeder::class,
-            //CategorySeeder::class,
-           // ProductSeeder::class,
-           // DepartementSeeder::class,
-           // CitySeeder::class
+            ImageSeeder::class,
+            CategorySeeder::class,
+            ProductSeeder::class,
+            DepartementSeeder::class,
+            CitySeeder::class
         ]);
     }
 }
