@@ -14,7 +14,8 @@
 /auth.json
 /node_modules
 /public/build
-/public/hot
+/public/bordereaux
+/public/proformas
 /public/storage
 /storage/*.key
 /storage/pail
