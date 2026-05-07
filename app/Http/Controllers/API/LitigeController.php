@@ -35,7 +35,6 @@ class LitigeController extends Controller
                 'order_id' => $litige->commande?->id,
                 'type' => $litige->type,
                 'description' => $litige->description,
-
                 'status' => $litige->stringStatus->value,
                 'status_class' => $litige->stringStatus->class,
 
@@ -104,7 +103,7 @@ class LitigeController extends Controller
             'order_id' => 'required|exists:commandes,id',
             'type' => 'required|string',
             'description' => 'required|string',
-            'photos.*' => 'image|max:2048'
+            'proofs.*' => 'image|max:2048'
         ]);
 
         $photos = [];
@@ -149,6 +148,7 @@ class LitigeController extends Controller
             'type' => $litige->type,
             'description' => $litige->description,
             'status' => $litige->stringStatus->value,
+             'status_class' => $litige->stringStatus->class,
             'photos' => $litige->photos,
             'submitted_at' => $litige->submitted_at,
             'customer_name' => $litige->user->name
@@ -158,6 +158,9 @@ class LitigeController extends Controller
 
     /**
      * Mise à jour d'un litige
+     * @param Request $request
+     * @param Litige $litige
+     * @return JsonResponse
      */
     public function update(Request $request, Litige $litige)
     {
@@ -173,7 +176,11 @@ class LitigeController extends Controller
 
         return Helpers::success($litige);
     }
-
+    public function updateStatus(Request $request, $id) {
+        $litige = Litige::findOrFail($id);
+        $litige->update(['status' => $request->status]);
+        return response()->json(['message' => 'Statut mis à jour']);
+    }
 
     /**
      * Suppression

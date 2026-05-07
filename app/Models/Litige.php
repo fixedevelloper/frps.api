@@ -46,32 +46,42 @@ class Litige extends Model
 |--------------------------------------------------------------------------
 */
 
+    /**
+     * Accesseur pour obtenir le badge et le libellé formaté
+     * Usage côté API : $litige->string_status
+     */
     public function getStringStatusAttribute()
     {
         $statuses = [
-            'pending' => [
-                'class' => 'badge bg-warning',
-                'value' => 'En attente'
+            'Ouvert' => [
+                'class' => 'bg-danger-subtle text-danger', // Style "Soft" moderne
+                'value' => 'Ouvert'
             ],
-            'processing' => [
-                'class' => 'badge bg-primary',
+            'En cours' => [
+                'class' => 'bg-warning-subtle text-warning',
                 'value' => 'En traitement'
             ],
-            'resolved' => [
-                'class' => 'badge bg-success',
+            'Résolu' => [
+                'class' => 'bg-success-subtle text-success',
                 'value' => 'Résolu'
             ],
-            'rejected' => [
-                'class' => 'badge bg-danger',
-                'value' => 'Rejeté'
+            'Fermé' => [
+                'class' => 'bg-secondary-subtle text-secondary',
+                'value' => 'Clôturé'
             ],
         ];
 
+        // On retourne un objet pour un accès facile en JSON (ex: item.string_status.class)
         return (object) ($statuses[$this->status] ?? [
-                'class' => 'badge bg-secondary',
-                'value' => 'Inconnu'
+                'class' => 'bg-light text-dark',
+                'value' => $this->status ?? 'Inconnu'
             ]);
     }
+
+    /**
+     * N'oubliez pas d'ajouter l'attribut à la sérialisation JSON
+     */
+    protected $appends = ['string_status'];
 
     public function getStringTypeAttribute()
     {

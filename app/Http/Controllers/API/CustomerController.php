@@ -143,7 +143,6 @@ class CustomerController extends Controller
             ]
         ]);
     }
-
     // Mettre à jour infos client
     public function updateInfo(Request $request)
     {
@@ -174,5 +173,13 @@ class CustomerController extends Controller
 
 
         return Helpers::success($client,'Informations mises à jour avec succès');
+    }
+    public function destroyReturn(ReturnRequest $returnRequest)
+    {
+        $returnRequest->delete();
+
+        return Helpers::success([
+            'message' => 'Return supprimé'
+        ]);
     }
 }

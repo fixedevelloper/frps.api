@@ -11,6 +11,7 @@ class ProductResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
+     * @param Request $request
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
@@ -30,7 +31,11 @@ class ProductResource extends JsonResource
             'dateFabrication' => $this->date_fabrication,
             'datePeremption' => $this->date_peremption,
             'status' => $this->publish ? 'publie' : 'En attente',
-            'image' => $this->image ? (env('APP_URL') . Storage::url($this->image->src) ?? '') : null,
+
+            // Logique simplifiée pour l'image
+            'image' => ($this->image && $this->image->src)
+                ? url(Storage::url($this->image->src))
+                : null,
         ];
     }
 }

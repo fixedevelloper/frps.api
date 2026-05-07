@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
+use App\Models\Image;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Faker\Factory as Faker;
@@ -13,7 +14,7 @@ class ProductSeeder extends Seeder
     public function run()
     {
         $faker = Faker::create();
-        $imageIds = \App\Models\Image::pluck('id')->toArray();
+        $imageIds = Image::pluck('id')->toArray();
         $categoryIds = Category::pluck('id')->toArray();
         $medicaments = [
             'Paracétamol 500mg',
@@ -125,7 +126,8 @@ class ProductSeeder extends Seeder
                 'unite'              => $faker->randomElement(['mg', 'ml', 'kg', 'L']),
                 'poids'              => $faker->optional()->randomElement(['10kg', '1.5L', '500g']),
                 'category_id' => $faker->randomElement($categoryIds),
-               'image_id' => $faker->optional()->randomElement($imageIds),
+                //'image_id' => $faker->optional()->randomElement($imageIds),
+                'image_id' => null,
                 'publish'=>$faker->boolean(),
                 'created_at'         => now(),
                 'updated_at'         => now(),

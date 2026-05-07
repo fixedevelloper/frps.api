@@ -50,8 +50,10 @@ Route::middleware(['jwt.verify', 'jwt.auth', 'verified'])->group(function () {
     //Route::get('litiges', [OrderController::class, 'getLitiges']);
     Route::get('returns', [OrderController::class, 'getReturns']);
     Route::get('litiges/customer', [LitigeController::class, 'getLitiges']);
+    Route::patch('litiges/{id}/status', [LitigeController::class, 'updateStatus']);
     Route::apiResource('litiges', LitigeController::class);
     Route::get('returns/customer', [CustomerController::class, 'getReturns']);
+    Route::delete('returns/{id}', [CustomerController::class, 'destroyReturn']);
     Route::get('orders/{id}/{status}/status', [OrderController::class, 'changeStatus']);
     Route::post('paiements', [OrderController::class, 'paiementFacture']);
     Route::get('customers', [SettingController::class, 'getCustomers']);
