@@ -45,6 +45,7 @@ Route::middleware(['jwt.verify', 'jwt.auth', 'verified'])->group(function () {
     Route::get('orders/customer', [OrderController::class, 'ordersCustomer']);
     Route::get('orders', [OrderController::class, 'orders']);
     Route::get('orders/{id}', [OrderController::class, 'orderDetail']);
+    Route::post('/orders/update-item', [OrderController::class, 'updateQuantity']);
    // Route::post('litiges', [OrderController::class, 'storeLitige']);
     Route::post('returns', [OrderController::class, 'storeReturn']);
     //Route::get('litiges', [OrderController::class, 'getLitiges']);

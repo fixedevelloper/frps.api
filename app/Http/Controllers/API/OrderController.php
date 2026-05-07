@@ -220,7 +220,7 @@ class OrderController extends Controller
                     ->notify(new NewOrderNotification($commande));
 
                 // 📲 SMS à l’admin en queue
-                $admin = User::query()->firstWhere('phone', $setting->notification_phone);
+/*                $admin = User::query()->firstWhere('phone', $setting->notification_phone);
                 $admin ?->notify(
                     new SmsNotification("Une nouvelle commande a été créée par $user->first_name. Montant: $commande->total FCFA !")
                 );
@@ -228,7 +228,7 @@ class OrderController extends Controller
              // 📲 SMS au client en queue
                 $user->notify(
                     new SmsNotification("Votre commande a été créée avec succès !")
-                );
+                );*/
             }
 
 
@@ -664,5 +664,33 @@ class OrderController extends Controller
 
         return $fullPath;
     }
+    public function updateQuantity(Request $request)
+    {
+        $request->validate([
+            'item_id' => 'required|integer|exists:product_commande,id',
+            'quantity' => 'required|integer|min:1',
+        ]);
 
+        $item = ProductCommande::findOrFail($request->item_id);
+
+        $item->quantite = $request->quantity;
+        $item->save();
+
+        // recalcul total ligne
+        $item->amount = $item->quantite * $item->product->price;
+       // $item->save();
+
+        // optionnel: recalcul total commande
+        $order = $item->commande;
+        $order->total = $order->products->sum(function ($i) {
+            return $i->quantite * $i->product->price;
+        });
+        $order->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Quantité mise à jour',
+            'data' => $item
+        ]);
+    }
 }
