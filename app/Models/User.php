@@ -31,30 +31,24 @@ class User extends Authenticatable implements JWTSubject,MustVerifyEmail
     {
         return [];
     }
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
-        'name',
-        'departement_id',
-        'city_id',
-        'phone',
-        'email',
-        'password','user_type'
+        'name', 'user_type', 'address', 'phone', 'email',
+        'password', 'activated', 'discount_rate', 'pending_balance',
+        'image_id', 'city_id', 'departement_id'
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
-        'password',
-        'remember_token',
+        'password', 'remember_token',
     ];
+
+    // Casts pour garantir les types de données
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'activated' => 'boolean',
+        'discount_rate' => 'float',
+        'pending_balance' => 'float',
+    ];
+
 
     /**
      * Get the attributes that should be cast.

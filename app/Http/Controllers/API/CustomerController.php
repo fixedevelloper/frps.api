@@ -90,39 +90,54 @@ class CustomerController extends Controller
     }
     public function index(Request $request)
     {
-        $query = Product::query();
+        // On charge les relations utiles (category, image) pour éviter le problème N+1
+        $query = Product::with(['category', 'image'])->where('publish', true);
 
-        // Pagination params (pageSize par défaut)
-        $pageSize = $request->query('pageSize', 10);
-        $page = $request->query('page', 1);
+        /*
+        |--------------------------------------------------------------------------
+        | Filtres
+        |--------------------------------------------------------------------------
+        */
 
-        // Filtres
-        if ($request->has('category')) {
-            $query->where('category_id', $request->query('category'));
-        }
-
-        if ($request->has('search')) {
+        // Recherche textuelle
+        if ($request->filled('search')) {
             $search = $request->query('search');
             $query->where('intitule', 'LIKE', "%{$search}%");
         }
 
-        if ($request->has('priceRange')) {
+        // Filtre par catégorie
+        if ($request->filled('category')) {
+            $query->where('category_id', $request->query('category'));
+        }
+
+        // Filtre par plage de prix
+        if ($request->filled('priceRange')) {
             $prices = explode(',', $request->query('priceRange'));
             if (count($prices) === 2) {
-                $min = floatval($prices[0]);
-                $max = floatval($prices[1]);
-                $query->whereBetween('price', [$min, $max]);
+                $query->whereBetween('price', [floatval($prices[0]), floatval($prices[1])]);
             }
         }
 
-        // Paginate avec pageSize et page demandés
+        /*
+        |--------------------------------------------------------------------------
+        | Tri et Pagination
+        |--------------------------------------------------------------------------
+        */
+
+        // Ajout du tri par nom (A-Z)
+        $query->orderBy('intitule', 'asc');
+
+        $pageSize = $request->query('pageSize', 10);
+        $page = $request->query('page', 1);
+
         $products = $query->paginate($pageSize, ['*'], 'page', $page);
 
         return Helpers::success([
-            'total' => $products->total(),
+            'total'        => $products->total(),
             'current_page' => $products->currentPage(),
-            'last_page' => $products->lastPage(),
-            'data' => ProductResource::collection($products->items()),
+            'last_page'    => $products->lastPage(),
+            'per_page'     => $products->perPage(),
+            'data'         => ProductResource::collection($products->items()),
         ]);
     }
     // Récupérer infos du client connecté

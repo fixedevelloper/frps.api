@@ -4,6 +4,7 @@ use App\Http\Controllers\API\AdvantageController;
 use App\Http\Controllers\API\CatalogueController;
 use App\Http\Controllers\API\CustomerController;
 use App\Http\Controllers\API\DashboardController;
+use App\Http\Controllers\API\EnterStockController;
 use App\Http\Controllers\API\JWTAuthController;
 use App\Http\Controllers\API\LitigeMessageController;
 use App\Http\Controllers\API\LivraisonController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\API\PasswordController;
 use App\Http\Controllers\API\SettingController;
 use App\Http\Controllers\API\TransporteurController;
 use App\Http\Controllers\API\LitigeController;
+use App\Http\Controllers\API\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -29,6 +31,11 @@ Route::get('departements', [SettingController::class, 'departements']);
 Route::get('cities/{departement_id}', [SettingController::class, 'cities']);
 Route::middleware(['jwt.verify', 'jwt.auth', 'verified'])->group(function () {
     Route::get('user', [JWTAuthController::class, 'getUser']);
+    Route::get('/users', [UserController::class, 'index']);
+    Route::post('/users', [UserController::class, 'storeOrUpdate']); // Création
+    Route::get('/users/{id}', [UserController::class, 'show']);
+    Route::post('/users/{id}', [UserController::class, 'storeOrUpdate']); // Update (via POST + _method: PUT côté Angular)
+    Route::delete('/users/{id}', [UserController::class, 'destroy']);
     Route::post('logout', [JWTAuthController::class, 'logout']);
     Route::post('stocks', [CatalogueController::class, 'updateStock']);
     Route::post('products', [CatalogueController::class, 'storeProduct']);
@@ -54,6 +61,7 @@ Route::middleware(['jwt.verify', 'jwt.auth', 'verified'])->group(function () {
     Route::get('litiges/customer', [LitigeController::class, 'getLitiges']);
     Route::patch('litiges/{id}/status', [LitigeController::class, 'updateStatus']);
     Route::apiResource('litiges', LitigeController::class);
+    Route::apiResource('enter-stocks', EnterStockController::class);
     Route::get('returns/customer', [CustomerController::class, 'getReturns']);
     Route::delete('returns/{id}', [CustomerController::class, 'destroyReturn']);
     Route::get('orders/{id}/{status}/status', [OrderController::class, 'changeStatus']);

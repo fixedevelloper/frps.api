@@ -149,18 +149,22 @@ class CatalogueController extends Controller
     }
     public function products(Request $request)
     {
-        $perPage = $request->input('per_page', 5); // nombre d'éléments par page
-        $page = $request->input('page', 1); // numéro de la page
+        $perPage = $request->input('per_page', 10); // Augmenté à 10 par défaut pour plus de cohérence
+        $page = $request->input('page', 1);
 
-        $paginator = Product::with(['category', 'image'])->where(['publish' => true])->paginate($perPage, ['*'], 'page', $page);
-
+        $paginator = Product::with(['category', 'image'])
+            ->where('publish', true)
+            ->orderBy('intitule', 'asc') // Ajout du tri par nom (A-Z)
+            ->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json([
             'data' => ProductResource::collection($paginator->items()),
-            'current_page' => $paginator->currentPage(),
-            'last_page' => $paginator->lastPage(),
-            'per_page' => $paginator->perPage(),
-            'total' => $paginator->total(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ]
         ]);
     }
 
@@ -216,26 +220,33 @@ class CatalogueController extends Controller
     {
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1',
+            'quantity'   => 'required|numeric', // Permet les ajustements positifs ou négatifs
         ]);
 
-        $product = Product::findOrFail($validated['product_id']);
-        DB::beginTransaction();
-        // Enregistrement dans l'historique d'entrée
-        EnterStock::create([
-            'quantity' => $validated['quantity'],
-            'product_id' => $product->id,
-            'created_by' => Auth::id(),
-            'previous_quantity' => $product->quantite,
-        ]);
+        try {
+            return DB::transaction(function () use ($validated) {
+                // On crée l'entrée.
+                // Si la logique booted() est en place, le stock du produit
+                // est mis à jour automatiquement ici.
+                $enterStock = EnterStock::create([
+                    'product_id' => $validated['product_id'],
+                    'quantity'   => $validated['quantity'],
+                    'created_by' => Auth::id(),
+                    'status'     => Helper::STATUSSUCCESS, // On valide l'entrée
+                ]);
 
-        // Mise à jour du stock produit
-        $product->increment('quantite', $validated['quantity']);
-        DB::commit();
-        return response()->json([
-            'message' => 'Stock mis à jour avec succès.',
-            'product' => $product->fresh(),
-        ], 200);
+                return response()->json([
+                    'message' => 'Stock mis à jour avec succès.',
+                    'product' => $enterStock->product->fresh(),
+                ], 200);
+            });
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erreur lors de la mise à jour.',
+                'error'   => $e->getMessage()
+            ], 400);
+        }
     }
     public function getProductByID(Request $request, $id)
     {
@@ -313,19 +324,6 @@ class CatalogueController extends Controller
             'produits' => 'required|array',
         ]);
 
-/*        foreach ($request->produits as $row) {
-            $nomFamille = trim($row['Famille']); // enlève espaces avant/après
-            $nomFamilleLower = mb_strtolower($nomFamille); // minuscule pour comparaison
-
-            $famille = Category::whereRaw('LOWER(intitule) = ?', [$nomFamilleLower])->first();
-
-            if (!$famille) {
-                // Créer seulement si pas trouvé
-                $famille = Category::create([
-                    'intitule' => $nomFamille
-                ]);
-            }
-        }*/
         $categoriesCache = []; // pour éviter les requêtes répétées
 
         foreach ($request->produits as $row) {

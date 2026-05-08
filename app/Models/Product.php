@@ -29,4 +29,14 @@ class Product extends Model
     {
         return $this->belongsTo(Category::class);
     }
+    // App/Models/Product.php
+
+    public function decrementStock(int $quantity)
+    {
+        if ($this->quantite < $quantity) {
+         //   throw new \Exception("Stock insuffisant pour le produit : {$this->intitule}");
+        }
+
+        $this->decrement('quantite', $quantity);
+    }
 }
