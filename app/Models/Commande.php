@@ -48,7 +48,14 @@ class Commande extends Model
     {
         return $this->hasMany(Litige::class, 'commande_id');
     }
-
+    public function advantages()
+    {
+        return $this->belongsToMany(
+            Advantage::class,
+            'commande_advantages'
+        )->withPivot('amount')
+            ->withTimestamps();
+    }
     public function getStringStatusAttribute() {
         $statusMap = [
             Helper::STATUSSUCCESS     => ['class' => 'badge badge--success', 'value' => 'Succès'],

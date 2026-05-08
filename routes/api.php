@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\API\AdvantageController;
 use App\Http\Controllers\API\CatalogueController;
 use App\Http\Controllers\API\CustomerController;
 use App\Http\Controllers\API\DashboardController;
@@ -85,4 +86,42 @@ Route::middleware(['jwt.verify', 'jwt.auth', 'verified'])->group(function () {
     Route::get('/dashboard/last-orders', [DashboardController::class, 'lastOrders']);
     Route::get('/dashboard/statistics', [DashboardController::class, 'getStatistics']);
     Route::get('/dashboard/sale-days-chart', [DashboardController::class, 'salesWeekChart']);
+
+    Route::prefix('advantages')->group(function () {
+
+        /*
+        |--------------------------------------------------------------------------
+        | CRUD
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/', [AdvantageController::class, 'index']);
+
+        Route::post('/', [AdvantageController::class, 'store']);
+
+        Route::get('/{id}', [AdvantageController::class, 'show']);
+
+        Route::put('/{id}', [AdvantageController::class, 'update']);
+
+        Route::delete('/{id}', [AdvantageController::class, 'destroy']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Toggle actif / inactif
+        |--------------------------------------------------------------------------
+        */
+
+        Route::patch('/{id}/toggle', [AdvantageController::class, 'toggle']);
+
+    });
+    /*
+|--------------------------------------------------------------------------
+| Avantages d'un client
+|--------------------------------------------------------------------------
+*/
+
+    Route::get(
+        '/customers/{id}/advantages',
+        [AdvantageController::class, 'customerAdvantages']
+    );
 });

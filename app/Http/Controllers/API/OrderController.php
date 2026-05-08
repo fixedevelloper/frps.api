@@ -7,6 +7,7 @@ namespace App\Http\Controllers\API;
 use App\Helpers\api\Helpers;
 use App\Helpers\Helper;
 use App\Http\Controllers\Controller;
+use App\Models\Advantage;
 use App\Models\Category;
 use App\Models\Commande;
 use App\Models\Litige;
@@ -27,6 +28,7 @@ use App\Services\TransactService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -35,16 +37,17 @@ use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
-    private $pdfService;
     protected $tranzakService;
+    private $pdfService;
+
     /**
      * OrderController constructor.
      * @param $pdfService
      */
-    public function __construct(PdfService $pdfService,TransactService $tranzakService)
+    public function __construct(PdfService $pdfService, TransactService $tranzakService)
     {
         $this->pdfService = $pdfService;
-        $this->tranzakService=$tranzakService;
+        $this->tranzakService = $tranzakService;
     }
 
     public function ordersCustomer(Request $request)
@@ -72,8 +75,8 @@ class OrderController extends Controller
                 'status' => $commande->stringStatus->value,
                 'validatedStatus' => $commande->stringValidatedStatus->value,
                 'date' => $commande->created_at,
-                'customer_image' => $commande->customer->image?->src,
-            'customer_name' => $commande->customer?->name,
+                'customer_image' => $commande->customer->image ?->src,
+            'customer_name' => $commande->customer ?->name,
 
             // Produits commandés
             'items' => $commande->products->map(function ($item) {
@@ -220,15 +223,15 @@ class OrderController extends Controller
                     ->notify(new NewOrderNotification($commande));
 
                 // 📲 SMS à l’admin en queue
-/*                $admin = User::query()->firstWhere('phone', $setting->notification_phone);
-                $admin ?->notify(
-                    new SmsNotification("Une nouvelle commande a été créée par $user->first_name. Montant: $commande->total FCFA !")
-                );
+                /*                $admin = User::query()->firstWhere('phone', $setting->notification_phone);
+                                $admin ?->notify(
+                                    new SmsNotification("Une nouvelle commande a été créée par $user->first_name. Montant: $commande->total FCFA !")
+                                );
 
-             // 📲 SMS au client en queue
-                $user->notify(
-                    new SmsNotification("Votre commande a été créée avec succès !")
-                );*/
+                             // 📲 SMS au client en queue
+                                $user->notify(
+                                    new SmsNotification("Votre commande a été créée avec succès !")
+                                );*/
             }
 
 
@@ -262,6 +265,7 @@ class OrderController extends Controller
             'id' => $commande->id,
             'reference' => $commande->reference,
             'total' => $commande->total,
+            'rest_to_pay' => $commande->rest_to_pay,
             'status' => $commande->stringStatus->value,
             'statusValue' => $commande->status,
             'date' => $commande->created_at,
@@ -312,6 +316,33 @@ class OrderController extends Controller
                     'date' => $item->date_paiement,
                 ];
             }),
+            'advantages' => $commande->customer->advantages
+                ->where('active', true)
+                ->map(function ($advantage) {
+
+                    return [
+
+                        'id' => $advantage->id,
+
+                        'type' => $advantage->type,
+
+                        'label' => $advantage->label,
+
+                        'description' => $advantage->description,
+
+                        'value' => $advantage->value,
+
+                        'is_percentage' => $advantage->is_percentage,
+
+                        'percentage_paid' => $advantage->percentage_paid,
+
+                        'due_date' => $advantage->due_date,
+
+                        'active' => $advantage->active,
+
+                    ];
+
+                })->values(),
         ];
 
         return Helpers::success($order);
@@ -438,70 +469,219 @@ class OrderController extends Controller
         return Helpers::success($commande, 'Statut mis à jour avec succès.');
     }
 
+    public function generateProformat($commande)
+    {
+        $directory = public_path('proformas');
+
+        if (!File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        $filename = "proforma_commande_{$commande->id}_" . time() . ".pdf";
+        $fullPath = $directory . '/' . $filename;
+
+        $pdf = Pdf::loadView('pdf.proforma', [
+            'commande' => $commande
+        ])->setPaper('A4', 'portrait');
+
+        $pdf->save($fullPath);
+
+        // Sauvegarde du lien en base
+        $commande->update([
+            'proforma_pdf' => 'proformas/' . $filename
+        ]);
+
+        return $fullPath;
+    }
 
     public function paiementFacture(Request $request)
     {
         DB::beginTransaction();
 
         try {
+            /*
+            |--------------------------------------------------------------------------
+            | 1. Validation des entrées
+            |--------------------------------------------------------------------------
+            */
+            $request->validate([
+                'order_id'     => ['required', 'exists:commandes,id'],
+                'amount'       => ['required', 'numeric', 'min:0'],
+                'methodPayment'=> ['required'],
+                'advantage_id' => ['nullable', 'exists:advantages,id']
+            ]);
+
             $commande = Commande::findOrFail($request->order_id);
 
-            // Montant déjà payé avant ce paiement
-            $totalPayeAvant = $commande->total - $commande->rest_to_pay;
+            /*
+            |--------------------------------------------------------------------------
+            | 2. Vérification d'avantage existant (Contrainte demandée)
+            |--------------------------------------------------------------------------
+            | On vérifie si la commande a déjà un avantage lié dans la table pivot
+            */
+            if ($request->filled('advantage_id')) {
+                $hasAdvantage = DB::table('commande_advantages')
+                    ->where('commande_id', $commande->id)
+                    ->exists();
 
-            // Vérification : empêcher de dépasser le total
-            if ($totalPayeAvant + $request->amount > $commande->total) {
-                return Helpers::error("Le montant payé dépasse le total de la commande.");
+                if ($hasAdvantage) {
+                    return Helpers::error("Cette commande bénéficie déjà d'un avantage. Les remises ne sont pas cumulables.");
+                }
             }
-            // 5️⃣ référence paiement
+
+            /*
+            |--------------------------------------------------------------------------
+            | 3. Initialisation des variables de calcul
+            |--------------------------------------------------------------------------
+            */
+            $montantInitial = (float) $commande->rest_to_pay;
+            $discount       = 0;
+            $montantFinal   = $montantInitial;
+            $advantage      = null;
+
+            /*
+            |--------------------------------------------------------------------------
+            | 4. Logique de calcul de l'avantage
+            |--------------------------------------------------------------------------
+            */
+            if ($request->filled('advantage_id')) {
+                $advantage = Advantage::findOrFail($request->advantage_id);
+
+                if (!$advantage->active) {
+                    return Helpers::error("Cet avantage est actuellement désactivé.");
+                }
+
+                switch ($advantage->type) {
+                    case 'remise':
+                        $discount = $advantage->is_percentage
+                            ? ($montantInitial * $advantage->value) / 100
+                            : $advantage->value;
+                        $montantFinal = $montantInitial - $discount;
+                        break;
+
+                    case 'bon_reduction':
+                        $discount = $advantage->value;
+                        $montantFinal = $montantInitial - $discount;
+                        break;
+
+                    case 'paiement_differe':
+                        // Ici on calcule ce qui doit être payé immédiatement
+                        $montantFinal = ($montantInitial * $advantage->percentage_paid) / 100;
+                        // Le reste reste dans 'rest_to_pay' après soustraction du montant payé
+                        break;
+                }
+            }
+
+            // Sécurité : Le montant final ne peut pas être négatif
+            $montantFinal = max($montantFinal, 0);
+
+            /*
+            |--------------------------------------------------------------------------
+            | 5. Vérification de l'intégrité du montant
+            |--------------------------------------------------------------------------
+            */
+            if (round((float)$request->amount, 2) !== round($montantFinal, 2)) {
+                return Helpers::error("Le montant envoyé ({$request->amount}) ne correspond pas au calcul attendu ({$montantFinal}).");
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | 6. Initialisation du paiement Tranzak
+            |--------------------------------------------------------------------------
+            */
             $reference = 'FRPS-' . Str::upper(Str::random(10));
 
-            // 6️⃣ appel paiement
             $response = $this->tranzakService->makeColletion([
-                'amount' => $request->amount,
-                'reference' => $reference,
+                'amount'      => $montantFinal,
+                'reference'   => $reference,
                 'success_url' => url('/payment/success'),
-                'cancel_url' => url('/payment/cancel'),
-                'callback_url' => url('/tranzak/webhook'),
-                'description' => 'Paiement produits FRPS'
+                'cancel_url'  => url('/payment/cancel'),
+                'callback_url'=> url('/tranzak/webhook'),
+                'description' => "Paiement commande #{$commande->id}"
             ]);
-            // Création du paiement
+
+            /*
+            |--------------------------------------------------------------------------
+            | 7. Enregistrement et mise à jour
+            |--------------------------------------------------------------------------
+            */
             $paiement = Paiement::create([
-                'reference' => $response['data']['requestId'],
-                'commande_id' => $request->order_id,
-                'montant' => $request->amount,
-                'methode' => $request->methodPayment,
-                'status' => 'pending',
-                'etat' => Helper::PAIEMENTETATCOMPLET,
-                'date_paiement' => date('Y-m-d')
+                'reference'       => $response['data']['requestId'] ?? $reference,
+                'commande_id'     => $commande->id,
+                'montant'         => $montantFinal,
+                'methode'         => $request->methodPayment,
+                'status'          => 'pending',
+                'etat'            => Helper::PAIEMENTETATCOMPLET,
+                'date_paiement'   => now(),
+                'advantage_id'    => $advantage?->id,
+            'discount_amount' => $discount
+        ]);
+
+        // Mise à jour du reste à payer sur la commande
+        $nouveauReste = max($commande->rest_to_pay - $montantFinal - $discount, 0);
+
+        $commande->update([
+            'status'          => Helper::STATUSPROCESSING,
+            'rest_to_pay'     => $nouveauReste,
+            'discount_amount' => $commande->discount_amount + $discount
+        ]);
+
+        // Historique de l'avantage (Table Pivot)
+        if ($advantage) {
+            $commande->advantages()->attach($advantage->id, [
+                'amount' => $discount,
+                'created_at' => now()
             ]);
+        }
 
-            // Mise à jour du montant restant
-            $nouveauReste = $commande->rest_to_pay - $request->amount;
-            $commande->update([
-                'status' => Helper::STATUSPROCESSING,
-                'rest_to_pay' => max($nouveauReste, 0)
-            ]);
+        /*
+        |--------------------------------------------------------------------------
+        | 8. Bordereau (si premier paiement)
+        |--------------------------------------------------------------------------
+        */
+        if (($commande->total == $commande->rest_to_pay + $montantFinal + $discount)) {
+            $this->generateBordereau($commande);
+        }
 
-            // Générer bordereau seulement au premier paiement
-            if ($totalPayeAvant == 0) {
-                $this->generateBordereau($commande);
-               // $this->pdfService->generateBordereau($commande);
-            }
+        DB::commit();
 
-            DB::commit();
+        return Helpers::success([
+            'url'       => $response['data']['links']['paymentAuthUrl'],
+            'amount'    => $montantFinal,
+            'discount'  => $discount,
+            'remaining' => $nouveauReste
+        ]);
 
-            return Helpers::success([
-                'success' => true,
-                'url' => $response['data']['links']['paymentAuthUrl']
-            ]);
-
-        } catch (\Exception $e) {
+    } catch (\Exception $e) {
             DB::rollBack();
-            return Helpers::error("Erreur lors du paiement : " . $e->getMessage());
+            Log::error("Erreur Paiement: " . $e->getMessage());
+            return Helpers::error("Erreur système : " . $e->getMessage());
         }
     }
 
+    public function generateBordereau($commande)
+    {
+        $directory = public_path('bordereaux');
+
+        if (!File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        $filename = "bordereau_commande_{$commande->id}_" . time() . ".pdf";
+        $fullPath = $directory . '/' . $filename;
+
+        $pdf = Pdf::loadView('pdf.bordereau', [
+            'commande' => $commande
+        ])->setPaper('A4', 'portrait');
+
+        $pdf->save($fullPath);
+
+        $commande->update([
+            'bordereau_pdf' => 'bordereaux/' . $filename
+        ]);
+
+        return $fullPath;
+    }
 
     public function paiementCustomer(Request $request)
     {
@@ -526,24 +706,22 @@ class OrderController extends Controller
         return Helpers::success($orders);
     }
 
-
-
     public function getReturns(Request $request)
     {
         $perPage = $request->get('per_page', 10);
 
         $returns = ReturnRequest::with([
             'commande.customer.image',
-            'productOrder','productOrder.product'
+            'productOrder', 'productOrder.product'
         ])->latest()->paginate($perPage);
 
         $items = $returns->getCollection()->map(function ($returnRequest) {
 
-            $customer = $returnRequest->commande?->customer;
+            $customer = $returnRequest->commande ?->customer;
 
         return [
             'id' => $returnRequest->id,
-            'order_id' => $returnRequest->commande?->id,
+            'order_id' => $returnRequest->commande ?->id,
             'product_order_id' => $returnRequest->product_order_id,
 
             'reason' => $returnRequest->reason,
@@ -552,8 +730,8 @@ class OrderController extends Controller
             'date_demande' => $returnRequest->date_demande,
             'date_traitement' => $returnRequest->date_traitement,
            'product' => $returnRequest->productOrder->product,
-            'customer_image' => $customer?->image?->src,
-            'customer_name' => $customer?->name,
+            'customer_image' => $customer ?->image ?->src,
+            'customer_name' => $customer ?->name,
         ];
     });
 
@@ -593,53 +771,7 @@ class OrderController extends Controller
 
         return response()->json(['message' => 'Litige traité avec succès']);
     }
-    public function generateProformat($commande)
-    {
-        $directory = public_path('proformas');
 
-        if (!File::exists($directory)) {
-            File::makeDirectory($directory, 0755, true);
-        }
-
-        $filename = "proforma_commande_{$commande->id}_" . time() . ".pdf";
-        $fullPath = $directory . '/' . $filename;
-
-        $pdf = Pdf::loadView('pdf.proforma', [
-            'commande' => $commande
-        ])->setPaper('A4', 'portrait');
-
-        $pdf->save($fullPath);
-
-        // Sauvegarde du lien en base
-        $commande->update([
-            'proforma_pdf' => 'proformas/' . $filename
-        ]);
-
-        return $fullPath;
-    }
-    public function generateBordereau($commande)
-    {
-        $directory = public_path('bordereaux');
-
-        if (!File::exists($directory)) {
-            File::makeDirectory($directory, 0755, true);
-        }
-
-        $filename = "bordereau_commande_{$commande->id}_" . time() . ".pdf";
-        $fullPath = $directory . '/' . $filename;
-
-        $pdf = Pdf::loadView('pdf.bordereau', [
-            'commande' => $commande
-        ])->setPaper('A4', 'portrait');
-
-        $pdf->save($fullPath);
-
-        $commande->update([
-            'bordereau_pdf' => 'bordereaux/' . $filename
-        ]);
-
-        return $fullPath;
-    }
     public function generateFacture($commande, $avecTVA = false)
     {
         $directory = public_path('factures');
@@ -664,6 +796,7 @@ class OrderController extends Controller
 
         return $fullPath;
     }
+
     public function updateQuantity(Request $request)
     {
         $request->validate([
@@ -678,7 +811,7 @@ class OrderController extends Controller
 
         // recalcul total ligne
         $item->amount = $item->quantite * $item->product->price;
-       // $item->save();
+        // $item->save();
 
         // optionnel: recalcul total commande
         $order = $item->commande;

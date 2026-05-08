@@ -84,6 +84,10 @@ class User extends Authenticatable implements JWTSubject,MustVerifyEmail
     {
         return $this->hasMany(Commande::class);
     }
+    public function advantages()
+    {
+        return $this->hasMany(Advantage::class, 'customer_id');
+    }
     public function routeNotificationForSms()
     {
         return $this->phone; // colonne phone dans la DB
