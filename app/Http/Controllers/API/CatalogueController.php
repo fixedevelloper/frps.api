@@ -159,6 +159,10 @@ class CatalogueController extends Controller
 
         return response()->json([
             'data' => ProductResource::collection($paginator->items()),
+             'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'last_page' => $paginator->lastPage(),
