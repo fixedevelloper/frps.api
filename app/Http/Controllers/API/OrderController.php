@@ -141,7 +141,7 @@ class OrderController extends Controller
                 'status' => $commande->stringStatus->value,
                 'validatedStatus' => $commande->stringValidatedStatus->value,
                 'date' => $commande->created_at,
-                'customer_image' => $commande->customer,
+               'customer_image' => $commande->customer->image ?->src,
                 'customer_name' => $commande->customer ? $commande->customer->name : null,
                 'items' => $commande->products->map(fn($item) => [
                     'id' => $item->id,
