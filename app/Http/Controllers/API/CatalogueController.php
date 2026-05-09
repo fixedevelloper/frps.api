@@ -147,30 +147,57 @@ class CatalogueController extends Controller
             'data' => $categories
         ]);
     }
-    public function products(Request $request)
-    {
-        $perPage = $request->input('per_page', 10); // Augmenté à 10 par défaut pour plus de cohérence
-        $page = $request->input('page', 1);
+  public function products(Request $request)
+{
+    $perPage = $request->input('per_page', 10);
+    $page = $request->input('page', 1);
 
-        $paginator = Product::with(['category', 'image'])
-            ->where('publish', true)
-            ->orderBy('intitule', 'asc') // Ajout du tri par nom (A-Z)
-            ->paginate($perPage, ['*'], 'page', $page);
+    $search = $request->input('search');
+    $categoryId = $request->input('category_id');
 
-        return response()->json([
-            'data' => ProductResource::collection($paginator->items()),
-             'current_page' => $paginator->currentPage(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-            ]
-        ]);
+    $query = Product::with(['category', 'image'])
+        ->where('publish', true);
+
+    // 🔍 Recherche
+    if (!empty($search)) {
+        $query->where(function ($q) use ($search) {
+            $q->where('intitule', 'LIKE', "%{$search}%")
+              ->orWhere('referenceProduit', 'LIKE', "%{$search}%")
+              ->orWhere('numeroLot', 'LIKE', "%{$search}%");
+        });
     }
+
+    // 📂 Filtre catégorie
+    if (!empty($categoryId)) {
+        $query->where('category_id', $categoryId);
+    }
+
+    // 🔤 Tri alphabétique
+    $query->orderBy('intitule', 'asc');
+
+    $paginator = $query->paginate(
+        $perPage,
+        ['*'],
+        'page',
+        $page
+    );
+
+    return response()->json([
+        'data' => ProductResource::collection($paginator->items()),
+
+        'current_page' => $paginator->currentPage(),
+        'last_page' => $paginator->lastPage(),
+        'per_page' => $paginator->perPage(),
+        'total' => $paginator->total(),
+
+        'meta' => [
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
+        ]
+    ]);
+}
 
     public function productsWaiting(Request $request)
     {
