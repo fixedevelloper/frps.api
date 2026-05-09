@@ -72,11 +72,12 @@ class OrderController extends Controller
                 'id' => $commande->id,
                 'reference' => $commande->reference,
                 'total' => $commande->total,
+                'rest_to_pay' => $commande->rest_to_pay,
                 'status' => $commande->stringStatus->value,
                 'validatedStatus' => $commande->stringValidatedStatus->value,
                 'date' => $commande->created_at,
                 'customer_image' => $commande->customer->image ?->src,
-            'customer_name' => $commande->customer ?->name,
+                'customer_name' => $commande->customer ?->name,
 
             // Produits commandés
             'items' => $commande->products->map(function ($item) {
@@ -581,7 +582,7 @@ class OrderController extends Controller
             |--------------------------------------------------------------------------
             */
             if (round((float)$request->amount, 2) !== round($montantFinal, 2)) {
-                return Helpers::error("Le montant envoyé ({$request->amount}) ne correspond pas au calcul attendu ({$montantFinal}).");
+               // return Helpers::error("Le montant envoyé ({$request->amount}) ne correspond pas au calcul attendu ({$montantFinal}).");
             }
 
             /*
