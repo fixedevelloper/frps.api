@@ -13,46 +13,33 @@ class CitySeeder extends Seeder
     public function run()
     {
         $adamaouaRegions = [
-            [
-                'department' => 'Vina',
-                'chef_lieu' => 'Meiganga',
-                'localities' => [
-                    'Meiganga', 'Ngaoundal', 'Nganha', 'Mbang', 'Ngoulemakong', 'Belel',
-                    'Bandjoun', 'Boulougou', 'Doumé', 'Beka', 'Kika',
+
+                [
+                    'department' => 'Vina',
+                    'chef_lieu'  => 'Ngaoundéré',
+                    'localities' => ['Ngaoundéré I', 'Ngaoundéré II', 'Ngaoundéré III', 'Belel', 'Mbe', 'Ngan-Ha', 'Nyambaka', 'Martap'],
                 ],
-            ],
-            [
-                'department' => 'Djerem',
-                'chef_lieu' => 'Tibati',
-                'localities' => [
-                    'Tibati', 'Bélabo', 'Garoua-Béïla', 'Ngoura', 'Mbe', 'Djohong', 'Lomie',
-                    'Lassa', 'Mbalmayo', 'Sangmelima', 'Madjam', 'Tignère', 'Foulbé', 'Woulé',
+                [
+                    'department' => 'Djerem',
+                    'chef_lieu'  => 'Tibati',
+                    'localities' => ['Tibati', 'Ngaoundal'],
                 ],
-            ],
-            [
-                'department' => 'Haute-Sanaga',
-                'chef_lieu' => 'Banyo',
-                'localities' => [
-                    'Banyo', 'Tibati', 'Beka', 'Tignère', 'Mingam', 'Koundou', 'Ngaoundéré',
-                    'Galim', 'Tchamba', 'Tcheboa', 'Nganha', 'Boulounga',
+                [
+                    'department' => 'Faro-et-Déo',
+                    'chef_lieu'  => 'Tignère',
+                    'localities' => ['Tignère', 'Galim-Tignère', 'Mayo-Baléo', 'Kontcha'],
                 ],
-            ],
-            [
-                'department' => 'Lom et Djérem',
-                'chef_lieu' => 'Tignère',
-                'localities' => [
-                    'Ngaoundéré', 'Mbe', 'Nganha', 'Loulou', 'Mbang', 'Goudjila', 'Djerem',
-                    'Missafou', 'Ngaoundal', 'Belel',
+                [
+                    'department' => 'Mayo-Banyo',
+                    'chef_lieu'  => 'Banyo',
+                    'localities' => ['Banyo', 'Bankim', 'Mayo-Darlé'],
                 ],
-            ],
-            [
-                'department' => 'Mefou-et-Akono',
-                'chef_lieu' => 'Ngoumou',
-                'localities' => [
-                    'Ngoumou', 'Mbankomo', 'Nkolndongo', 'Akono', 'Ebolowa',
-                    'Nkolbisson', 'Obala', 'Elig-Mfomo', 'Nyom', 'Nkolmot',
+                [
+                    'department' => 'Mbéré',
+                    'chef_lieu'  => 'Meiganga',
+                    'localities' => ['Meiganga', 'Djohong', 'Ngaoui', 'Dir'],
                 ],
-            ],
+
         ];
 
         // 1. Insertion des départements

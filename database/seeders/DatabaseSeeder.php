@@ -31,9 +31,9 @@ class DatabaseSeeder extends Seeder
             'notification_phone' => '237675066919',
         ]);
         $this->call([
-            ImageSeeder::class,
-            CategorySeeder::class,
-            ProductSeeder::class,
+           // ImageSeeder::class,
+           // CategorySeeder::class,
+           // ProductSeeder::class,
             DepartementSeeder::class,
             CitySeeder::class
         ]);
