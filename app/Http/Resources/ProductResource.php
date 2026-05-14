@@ -20,8 +20,11 @@ class ProductResource extends JsonResource
             'id' => $this->id,
             'intitule' => $this->intitule,
             'price' => $this->price,
+            'price_buy'=> $this->price_buy,
+            'type_stock'=>$this->type_stock,
             'referenceProduit' => $this->reference,
             'categorie' => $this->category ? $this->category->intitule : null,
+            'categorie_id' => $this->category_id,
             'numeroLot' => $this->lot,
             'quantiteParUnite' => $this->quantite,
             'uniteDeMesure' => $this->unite,
@@ -30,6 +33,9 @@ class ProductResource extends JsonResource
             'utilisateurCible' => $this->utilisateur_cible,
             'dateFabrication' => $this->date_fabrication,
             'datePeremption' => $this->date_peremption,
+            'presentation' => $this->presentation,
+            'description' => $this->description,
+            'stock' => $this->stock,
             'status' => $this->publish ? 'publie' : 'En attente',
 
             // Logique simplifiée pour l'image

@@ -153,25 +153,33 @@ class JWTAuthController extends Controller
 
         try {
             if (! $token = JWTAuth::attempt($credentials)) {
-                return Helpers::unauthorized(401,'Utilisateur non trouvé');
+                return Helpers::unauthorized(401, 'Utilisateur non trouvé');
             }
 
-            // Get the authenticated user.
-            $user = auth()->user();
-            if (($user->user_type == User::CUSTOMER_TYPE)) {
-                return Helpers::unauthorized(401,'Utilisateur non trouvé');
+            // Récupérer l'utilisateur avec ses rôles et permissions
+            $user = User::with('roles.permissions', 'permissions')->find(auth()->id());
+
+            // Sécurité : Vérifier le type d'utilisateur
+            if ($user->user_type == User::CUSTOMER_TYPE) {
+                return Helpers::unauthorized(401, 'Accès réservé au personnel');
             }
 
-            // (optional) Attach the role to the token.
-            $token = JWTAuth::claims(['role' => $user->role])->fromUser($user);
+            // Optionnel : Ajouter le rôle au token JWT
+            $token = JWTAuth::claims(['role' => $user->roles->first()?->name])->fromUser($user);
 
-            return Helpers::success([
+        // Récupérer uniquement les noms des permissions (tableau de strings)
+        // getAllPermissions() est une méthode de Spatie qui combine permissions directes et via rôles
+        $permissions = $user->getAllPermissions()->pluck('name');
 
-                'token'=>$token,
-                'phone'=>$user->phone,
-                'username'=>$user->name
-            ]);
-        } catch (JWTException $e) {
+        return Helpers::success([
+            'token'    => $token,
+            'phone'    => $user->phone,
+            'username' => $user->name,
+            'role'     => $user->roles->first()?->name,
+            'permissions' => $permissions // Envoyer le tableau ['products.view', 'orders.create', ...]
+        ]);
+
+    } catch (JWTException $e) {
             return Helpers::error('Could not create token');
         }
     }

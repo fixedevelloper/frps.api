@@ -16,9 +16,46 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class CatalogueController extends Controller
 {
+    public function showCategory($id)
+    {
+        $category = Category::find($id);
+
+        if (!$category) {
+            return response()->json(['message' => 'Catégorie non trouvée'], 404);
+        }
+
+        // On retourne l'objet. Laravel l'enveloppera dans 'data' si vous le souhaitez
+        return response()->json(['data' => $category]);
+    }
+
+    public function updateCategory(Request $request, $id)
+    {
+        $category = Category::findOrFail($id);
+
+        logger($request->all());
+        // Validation
+        $validated = $request->validate([
+            'intitule' => 'required|string|max:255',
+            'parent_id' => 'nullable|exists:categories,id',
+            'image' => 'nullable|image'
+        ]);
+
+        if ($request->hasFile('image')) {
+            // Supprimer l'ancienne image si elle existe
+            if ($category->image) {
+                Storage::disk('public')->delete($category->image);
+            }
+            $validated['image'] = $request->file('image')->store('categories', 'public');
+        }
+
+        $category->update($validated);
+        return response()->json(['data' => $category]);
+    }
+
     public function storeCategory(Request $request)
     {
         $validated = $request->validate([
@@ -123,7 +160,7 @@ class CatalogueController extends Controller
             ];
         }
 
-        return  response()->json([
+        return response()->json([
             'data' => $categories,
             'current_page' => $paginator->currentPage(),
             'last_page' => $paginator->lastPage(),
@@ -131,6 +168,7 @@ class CatalogueController extends Controller
             'total' => $paginator->total(),
         ]);
     }
+
     public function all_categories(Request $request)
     {
         $categories = [];
@@ -143,61 +181,62 @@ class CatalogueController extends Controller
             ];
         }
 
-        return  response()->json([
+        return response()->json([
             'data' => $categories
         ]);
     }
-  public function products(Request $request)
-{
-    $perPage = $request->input('per_page', 10);
-    $page = $request->input('page', 1);
 
-    $search = $request->input('search');
-    $categoryId = $request->input('category_id');
+    public function products(Request $request)
+    {
+        $perPage = $request->input('per_page', 10);
+        $page = $request->input('page', 1);
 
-    $query = Product::with(['category', 'image'])
-        ->where('publish', true);
+        $search = $request->input('search');
+        $categoryId = $request->input('category_id');
 
-    // 🔍 Recherche
-    if (!empty($search)) {
-        $query->where(function ($q) use ($search) {
-            $q->where('intitule', 'LIKE', "%{$search}%")
-              ->orWhere('referenceProduit', 'LIKE', "%{$search}%")
-              ->orWhere('numeroLot', 'LIKE', "%{$search}%");
-        });
-    }
+        $query = Product::with(['category', 'image'])
+            ->where('publish', true);
 
-    // 📂 Filtre catégorie
-    if (!empty($categoryId)) {
-        $query->where('category_id', $categoryId);
-    }
+        // 🔍 Recherche
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('intitule', 'LIKE', "%{$search}%")
+                    ->orWhere('referenceProduit', 'LIKE', "%{$search}%")
+                    ->orWhere('numeroLot', 'LIKE', "%{$search}%");
+            });
+        }
 
-    // 🔤 Tri alphabétique
-    $query->orderBy('intitule', 'asc');
+        // 📂 Filtre catégorie
+        if (!empty($categoryId)) {
+            $query->where('category_id', $categoryId);
+        }
 
-    $paginator = $query->paginate(
-        $perPage,
-        ['*'],
-        'page',
-        $page
-    );
+        // 🔤 Tri alphabétique
+        $query->orderBy('intitule', 'asc');
 
-    return response()->json([
-        'data' => ProductResource::collection($paginator->items()),
+        $paginator = $query->paginate(
+            $perPage,
+            ['*'],
+            'page',
+            $page
+        );
 
-        'current_page' => $paginator->currentPage(),
-        'last_page' => $paginator->lastPage(),
-        'per_page' => $paginator->perPage(),
-        'total' => $paginator->total(),
+        return response()->json([
+            'data' => ProductResource::collection($paginator->items()),
 
-        'meta' => [
             'current_page' => $paginator->currentPage(),
             'last_page' => $paginator->lastPage(),
             'per_page' => $paginator->perPage(),
             'total' => $paginator->total(),
-        ]
-    ]);
-}
+
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ]
+        ]);
+    }
 
     public function productsWaiting(Request $request)
     {
@@ -251,24 +290,28 @@ class CatalogueController extends Controller
     {
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity'   => 'required|numeric', // Permet les ajustements positifs ou négatifs
+            'quantity' => 'required|integer|min:1',
         ]);
 
         try {
             return DB::transaction(function () use ($validated) {
-                // On crée l'entrée.
-                // Si la logique booted() est en place, le stock du produit
-                // est mis à jour automatiquement ici.
+                // 1. Enregistrer l'historique du mouvement
                 $enterStock = EnterStock::create([
                     'product_id' => $validated['product_id'],
                     'quantity'   => $validated['quantity'],
                     'created_by' => Auth::id(),
-                    'status'     => Helper::STATUSSUCCESS, // On valide l'entrée
+                    'status'     => Helper::STATUSSUCCESS,
                 ]);
+
+                // 2. Mettre à jour le produit EXISTANT
+                $product = Product::findOrFail($validated['product_id']);
+
+                // On incrémente le stock actuel (ex: 10 + 5 = 15)
+                $product->increment('stock', $validated['quantity']);
 
                 return response()->json([
                     'message' => 'Stock mis à jour avec succès.',
-                    'product' => $enterStock->product->fresh(),
+                    'product' => $product->fresh(), // Retourne le produit avec son nouveau stock
                 ], 200);
             });
 
@@ -279,75 +322,90 @@ class CatalogueController extends Controller
             ], 400);
         }
     }
+
     public function getProductByID(Request $request, $id)
     {
         $cat = Product::findOrFail($id);
 
         return Helpers::success(new ProductResource($cat), 'Statut mis à jour avec succès.');
     }
-    public function updateProduct(Request $request,$id)
+
+    public function updateProduct(Request $request, $id)
     {
+        // 1. On récupère le produit en premier
+        $product = Product::findOrFail($id);
+
+        // 2. Validation (Alignée sur les noms envoyés par Angular dans le FormData)
         $validated = $request->validate([
             'intitule' => 'required|string',
-            'categorie' => 'required|string',
-            'reference' => 'required|string',
-            'suivi_stock' => 'required|string',
+            'category_id' => 'required|exists:categories,id',
+            'reference' => 'required|string|unique:products,reference,' . $id,
+            'type_stock' => 'required|in:Lot,FIFO,LIFO',
             'price' => 'required|numeric',
             'price_buy' => 'required|numeric',
             'lot' => 'nullable|string',
             'presentation' => 'nullable|string',
-            'dateFabrication' => 'required|date',
-            'datePeremption' => 'required|date',
+            'date_fabrication' => 'required|date',
+            'date_peremption' => 'required|date',
             'financement' => 'required|string',
-            'utilisateurCible' => 'required|string',
-            'conditionnement.quantite' => 'required|numeric',
-            'conditionnement.unite' => 'required|string',
-            'conditionnement.poids' => 'nullable|string',
+            'utilisateur_cible' => 'required|string',
+            'quantite' => 'required|numeric',
+            'unite' => 'required|string',
+            'poids' => 'nullable|string',
+            'description' => 'nullable|string',
             'image' => 'nullable|image|max:2048'
         ]);
-        $cat = Product::findOrFail($id);
+
+        // 3. Détermination du statut de publication
         $publish = Auth::user()->user_type === User::ADMIN_TYPE;
 
-        $cat->fill([
-            'intitule' => $validated['intitule'],
-            'category_id' => $validated['categorie'],
-            'reference' => $validated['reference'],
-            'type_stock' => $validated['suivi_stock'],
-            'price' => $validated['price'],
-            'price_buy' => $validated['price_buy'],
-            'lot' => $validated['lot'] ?? null,
-            'presentation' => $validated['presentation'] ?? null,
-            'date_fabrication' => $validated['dateFabrication'],
-            'date_peremption' => $validated['datePeremption'],
-            'financement' => $validated['financement'],
-            'utilisateur_cible' => $validated['utilisateurCible'],
-            'quantite' => $validated['conditionnement']['quantite'],
-            'unite' => $validated['conditionnement']['unite'],
-            'poids' => $validated['conditionnement']['poids'] ?? null,
-            'publish' => $publish,
-            'created_by' => Auth::id(),
+        // 4. Mise à jour des champs (Mapping direct avec le schéma SQL)
+        $product->fill([
+            'intitule'         => $validated['intitule'],
+            'category_id'      => $validated['category_id'],
+            'reference'        => $validated['reference'],
+            'type_stock'       => $validated['type_stock'],
+            'price'            => $validated['price'],
+            'price_buy'        => $validated['price_buy'],
+            'lot'              => $validated['lot'] ?? null,
+            'presentation'     => $validated['presentation'] ?? null,
+            'description'     => $validated['description'] ?? null,
+            'date_fabrication' => $validated['date_fabrication'],
+            'date_peremption'  => $validated['date_peremption'],
+            'financement'      => $validated['financement'],
+            'utilisateur_cible'=> $validated['utilisateur_cible'],
+            'quantite'         => $validated['quantite'],
+            'unite'            => $validated['unite'],
+            'poids'            => $validated['poids'] ?? null,
+            'publish'          => $publish,
         ]);
 
-        $cat->save();
+        $product->save();
 
-
+        // 5. Gestion de l'image (si un nouveau fichier est envoyé)
         if ($request->hasFile('image')) {
+            // Optionnel : Supprimer l'ancienne image physiquement et en BDD si nécessaire
+            if ($product->image) {
+                Storage::disk('public')->delete($product->image->src);
+                $product->image()->delete();
+            }
+
             $imagePath = $request->file('image')->store('products', 'public');
 
             $image = Image::create([
                 'src' => $imagePath
             ]);
 
-            $cat->image_id = $image->id;
-            $cat->save();
+            $product->image_id = $image->id;
+            $product->save();
         }
 
-
         return response()->json([
-            'message' => 'Produit enregistré',
-            'produit' => $cat->load('image') // si relation définie
-        ], 201);
+            'message' => 'Produit mis à jour avec succès',
+            'produit' => $product->load('image', 'category')
+        ], 200); // 200 pour un Update, 201 est réservé au Store
     }
+
     public function importProducts(Request $request)
     {
         logger($request->produits);
@@ -389,26 +447,26 @@ class CatalogueController extends Controller
             Product::updateOrCreate(
                 [
                     // Critères pour trouver un produit existant
-                    'intitule'   => $row['Désignation'] ?? '',
-                    'reference'   => $row['Référence article'] ?? null,
+                    'intitule' => $row['Désignation'] ?? '',
+                    'reference' => $row['Référence article'] ?? null,
                     'category_id' => $famille->id
                 ],
                 [
                     // Valeurs à insérer ou mettre à jour
-                    'intitule'           => $row['Désignation'] ?? '',
-                    'type_stock'         => $row['type_stock'] ?? 'Lot',
-                    'price'              => $row['price'] ?? 0,
-                    'price_buy'          => $row['price_buy'] ?? 0,
-                    'lot'                => $row['lot'] ?? '',
-                    'presentation'       => $row['presentation'] ?? '',
-                    'date_fabrication'   => $row['dateFabrication'] ?? date('Y-m-d'),
-                    'date_peremption'    => $row['datePeremption'] ?? date('Y-m-d'),
-                    'financement'        => $row['financement'] ?? '',
-                    'utilisateur_cible'  => $row['utilisateurCible'] ?? '',
-                    'quantite'           => $row['quantite'] ?? 0,
-                    'unite'              => $row['unite'] ?? '',
-                    'poids'              => $row['poids'] ?? 0,
-                    'created_by'         => auth()->id() ?? 1,
+                    'intitule' => $row['Désignation'] ?? '',
+                    'type_stock' => $row['type_stock'] ?? 'Lot',
+                    'price' => $row['price'] ?? 0,
+                    'price_buy' => $row['price_buy'] ?? 0,
+                    'lot' => $row['lot'] ?? '',
+                    'presentation' => $row['presentation'] ?? '',
+                    'date_fabrication' => $row['dateFabrication'] ?? date('Y-m-d'),
+                    'date_peremption' => $row['datePeremption'] ?? date('Y-m-d'),
+                    'financement' => $row['financement'] ?? '',
+                    'utilisateur_cible' => $row['utilisateurCible'] ?? '',
+                    'quantite' => $row['quantite'] ?? 0,
+                    'unite' => $row['unite'] ?? '',
+                    'poids' => $row['poids'] ?? 0,
+                    'created_by' => auth()->id() ?? 1,
                 ]
             );
 

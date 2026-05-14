@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Advantage;
 use App\Models\Category;
 use App\Models\Commande;
+use App\Models\EnterStock;
 use App\Models\Litige;
 use App\Models\Livraison;
 use App\Models\Paiement;
@@ -450,24 +451,49 @@ class OrderController extends Controller
 
     public function changeStatus(Request $request, $id, $status)
     {
-        $commande = Commande::findOrFail($id);
+        $commande = Commande::with('products.product')->findOrFail($id);
 
-        switch ($status) {
-            case 3:
-                Notification::route('mail', $commande->customer->email)->notify(new NewOrderNotification($commande));
-            case 4:
-                $this->generateProformat($commande);
-                //$this->pdfService->generateProformat($commande);
-                if ($commande->customer && $commande->customer->email) {
-                    $commande->customer->notify(new ProformaGenerated($commande));
+        try {
+            return DB::transaction(function () use ($commande, $status) {
+                switch ($status) {
+                    case 3:
+                        Notification::route('mail', $commande->customer->email)->notify(new NewOrderNotification($commande));
+                        break;
+
+                    case 4:
+                        $this->generateProformat($commande);
+                        if ($commande->customer && $commande->customer->email) {
+                            $commande->customer->notify(new ProformaGenerated($commande));
+                        }
+                        break;
+
+                    case 7:
+                        // Décrémentation du stock pour chaque article de la commande
+                        foreach ($commande->products as $item) {
+                            if ($item->product) {
+                                EnterStock::create([
+                                    'product_id' => $item->product_id,
+                                    'quantity'   => -$item->quantity, // Valeur négative pour décrémenter
+                                    'status'     => Helper::STATUSSUCCESS,
+                                    'reference'  => 'SORTIE-CMD-' . $commande->reference,
+                                ]);
+                            }
+                        }
+                        break;
                 }
 
-        }
-        $commande->update([
-            'status' => $status
-        ]);
+                $commande->update([
+                    'status' => $status
+                ]);
 
-        return Helpers::success($commande, 'Statut mis à jour avec succès.');
+                return Helpers::success($commande, 'Statut mis à jour avec succès.');
+            });
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erreur lors du changement de statut.',
+                'error'   => $e->getMessage()
+            ], 400);
+        }
     }
 
     public function generateProformat($commande)

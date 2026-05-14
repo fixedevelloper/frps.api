@@ -14,13 +14,7 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-       User::factory()->create([
-            'name' => 'Super Admin',
-            'email' => 'admin@localhost.com',
-            'phone' => '650000000',
-           'password' => '123456789',
-            'user_type'=>0
-        ]);
+
         Setting::create([
             'name' => 'FRPS',
             'email' => 'admin@localhost.com',
@@ -31,6 +25,7 @@ class DatabaseSeeder extends Seeder
             'notification_phone' => '237675066919',
         ]);
         $this->call([
+            RoleAndPermissionSeeder::class,
            // ImageSeeder::class,
            // CategorySeeder::class,
            // ProductSeeder::class,

@@ -14,10 +14,11 @@ class Product extends Model
         'date_fabrication',
         'date_peremption',
         'financement',
-        'utilisateur_cible',
-        'quantite', 'unite',
+        'utilisateur_cible','presentation','description',
+        'quantite',
+        'unite',
         'poids',
-        'price',
+        'price','price_buy','type_stock','stock',
         'image_id',
         'publish'
     ];

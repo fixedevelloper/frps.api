@@ -6,6 +6,7 @@ namespace App\Http\Controllers\API;
 
 use App\Helpers\api\Helpers;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\SettingResource;
 use App\Models\Category;
 use App\Models\City;
 use App\Models\Departement;
@@ -63,26 +64,40 @@ class SettingController extends Controller
     }
     public function getAgents(Request $request)
     {
-        $litiges = User::with([
+        // 1. On ajoute 'roles' dans le eager loading pour éviter le problème N+1
+        $agents = User::with([
             'image',
-            'city','departement'
-        ])->where(['user_type'=>User::AGENT_TYPE])->orWhere(['user_type'=>User::DRIVER_TYPE])->get();
+            'city',
+            'departement',
+            'roles'
+        ])
+// 1. Filtrer par type d'utilisateur (Agent ou Chauffeur)
+            ->whereNotIn('user_type', [User::CUSTOMER_TYPE])
 
-        $items = $litiges->map(function ($payment) {
+// 2. Exclure ceux qui possèdent le rôle 'admin' chez Spatie
+            ->whereDoesntHave('roles', function ($query) {
+                $query->where('name', 'admin');
+            })
+            ->get();
+
+        $items = $agents->map(function ($user) {
             return [
-                'id' => $payment->id,
-                'name' => $payment->name,
-                'role' => $payment->user_type==User::DRIVER_TYPE?'Chauffeur':'Agent',
-                'email' => $payment->email,
-                'phone' => $payment->phone,
-                'date' => $payment->created_at,
-                'image' => $payment->image ? $payment->image->src : null,
-                'departement' => $payment->departement
-                    ? $payment->departement->name
-                    : null,
-                'city' => $payment->city
-                    ? $payment->city->name
-                    : null,
+                'id' => $user->id,
+                'name' => $user->name,
+                // 2. Récupération dynamique du rôle via Spatie
+                // On prend le premier rôle assigné, sinon on garde l'ancien système par défaut
+                'role' => $user->roles->first() ? $user->roles->first()->name : ($user->user_type == User::DRIVER_TYPE ? 'Chauffeur' : 'Agent'),
+
+                // 3. Optionnel : Liste complète des rôles si un user peut en avoir plusieurs
+                'all_roles' => $user->getRoleNames(),
+
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'status' => $user->activated,
+                'date' => $user->created_at,
+                'image' => $user->image ? $user->image->src : null,
+                'departement' => $user->departement ? $user->departement->name : null,
+                'city' => $user->city ? $user->city->name : null,
             ];
         });
 
@@ -94,7 +109,7 @@ class SettingController extends Controller
             'name' => 'required|string',
             'phone' => 'required|string',
             'email' => 'required|string',
-            'type' => 'required|string',
+            'type' => 'required|exists:roles,name',
             'image' => 'nullable|image|max:2048' // max 2 Mo
         ]);
 
@@ -103,29 +118,99 @@ class SettingController extends Controller
         $imagePath = null;
 
 
-        $category= User::create([
+        $user= User::create([
             'name' => $validated['name'],
             'phone' => $validated['phone'],
             'email' => $validated['email'],
-            'user_type' => $validated['type']=='chauffeur'?User::DRIVER_TYPE: User::AGENT_TYPE,
+            'user_type' => User::AGENT_TYPE,
             'password' => Hash::make('123456789'),
         ]);
+        $user->assignRole($validated['type']);
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('categories', 'public');
             $image=Image::create([
                 'src'=>$imagePath
             ]);
-            $category->image_id=$image->id;
-            $category->save();
+            $user->image_id=$image->id;
+            $user->save();
         }
-        return Helpers::success($category,'Agent enregistré');
+        return Helpers::success($user,'Agent enregistré');
     }
+    public function updateAgent(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
 
+        $validated = $request->validate([
+            'name'  => 'required|string',
+            'phone' => 'required|string',
+            // On ignore l'ID actuel pour la validation unique de l'email
+            'email' => 'required|email|unique:users,email,' . $id,
+            'type'  => 'required|exists:roles,name',
+            'image' => 'nullable|image|max:2048'
+        ]);
+
+        // 1. Mise à jour des informations de base
+        $user->update([
+            'name'  => $validated['name'],
+            'phone' => $validated['phone'],
+            'email' => $validated['email'],
+            // On s'assure que le user_type reste cohérent
+            'user_type' => ($validated['type'] === 'chauffeur') ? User::DRIVER_TYPE : User::AGENT_TYPE,
+        ]);
+
+        // 2. Mise à jour du rôle Spatie (syncRoles remplace l'ancien rôle par le nouveau)
+        $user->syncRoles([$validated['type']]);
+
+        // 3. Gestion de l'image
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('agents', 'public');
+
+            $image = Image::create([
+                'src' => $imagePath
+            ]);
+
+            $user->image_id = $image->id;
+            $user->save();
+        }
+
+        return Helpers::success($user->load('roles', 'image'), 'Agent mis à jour avec succès');
+    }
+    public function updateStatus(Request $request, $id)
+    {
+        $agent = User::findOrFail($id);
+
+        // On valide que le statut est bien un booléen
+        $request->validate([
+            'status' => 'required|boolean'
+        ]);
+
+        $agent->update([
+            'activated' => $request->status
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $agent->status ? 'Agent activé' : 'Agent désactivé',
+            'data' => $agent
+        ]);
+    }
     // Retourne l'unique Setting
     public function show()
     {
-        $setting = Setting::first(); // on suppose qu’il y en a un seul
-        return Helpers::success($setting,'Agent enregistré');
+        // On récupère le premier enregistrement
+        $setting = Setting::first();
+
+        // Si aucune configuration n'existe, on retourne une erreur claire ou un objet vide
+        if (!$setting) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucune configuration trouvée.',
+                'data'    => null
+            ], 404);
+        }
+
+        // On utilise une Resource pour transformer les données (ex: transformer le chemin du logo en URL complète)
+        return Helpers::success(new SettingResource($setting), 'Configuration récupérée avec succès');
     }
 
     // Met à jour l'unique Setting

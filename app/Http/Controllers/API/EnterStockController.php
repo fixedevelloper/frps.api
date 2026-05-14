@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 
 use App\Helpers\api\Helpers;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\EnterStockResource;
 use App\Models\EnterStock;
 use App\Models\Product;
 use App\Helpers\Helper; // Assurez-vous d'avoir votre Helper pour les status
@@ -59,19 +60,24 @@ class EnterStockController extends Controller
      */
     public function index(Request $request)
     {
-        $query = EnterStock::with(['product'])
-            ->orderBy('created_at', 'desc');
+        $query = EnterStock::with(['product', 'creator']) // 'creator' pour éviter le problème N+1
+        ->orderBy('created_at', 'desc');
 
-        // Filtre par produit si présent
+        // Filtre par produit
         if ($request->filled('product_id')) {
-            $query->where('product_id', $request->query('product_id'));
+            $query->where('product_id', $request->product_id);
         }
 
-        // On exécute la pagination UNE SEULE FOIS
-        $paginator = $query->paginate(15);
+        // Filtre par statut (optionnel mais utile)
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $paginator = $query->paginate($request->query('per_page', 15));
 
         return response()->json([
-            'data'         => $paginator->items(), // Récupère uniquement les résultats de la page
+            // On transforme les items via la Resource
+            'data'         => EnterStockResource::collection($paginator->items()),
             'current_page' => $paginator->currentPage(),
             'last_page'    => $paginator->lastPage(),
             'per_page'     => $paginator->perPage(),

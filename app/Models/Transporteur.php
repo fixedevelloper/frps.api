@@ -13,6 +13,18 @@ class Transporteur extends Model
         'type','vehicule','chauffeur'
     ];
 
+    // Relation vers les détails externes
+    public function externe()
+    {
+        return $this->hasOne(TransporteurExterne::class);
+    }
+
+    // Relation vers les détails internes
+    public function interne()
+    {
+        return $this->hasOne(TransporteurInterne::class);
+    }
+
     public function transporteurExterne()
     {
         return $this->hasOne(TransporteurExterne::class);
