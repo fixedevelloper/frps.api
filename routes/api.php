@@ -7,6 +7,7 @@ use App\Http\Controllers\API\CatalogueController;
 use App\Http\Controllers\API\CustomerController;
 use App\Http\Controllers\API\DashboardController;
 use App\Http\Controllers\API\EnterStockController;
+use App\Http\Controllers\API\JWTAuthController;
 use App\Http\Controllers\API\LitigeController;
 use App\Http\Controllers\API\LitigeMessageController;
 use App\Http\Controllers\API\LivraisonController;
@@ -24,7 +25,7 @@ use Illuminate\Support\Facades\Route;
 | ROUTES PUBLIQUES (Sans Auth)
 |--------------------------------------------------------------------------
 */
-//Route::post('register', [JWTAuthController::class, 'register']);
+Route::post('register', [JWTAuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login'])->name('login');
 Route::post('login_admin', [AuthController::class, 'loginAdmin']);
 
