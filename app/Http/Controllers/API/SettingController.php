@@ -6,6 +6,7 @@ namespace App\Http\Controllers\API;
 
 use App\Helpers\api\Helpers;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\DepartementResource;
 use App\Http\Resources\SettingResource;
 use App\Models\Category;
 use App\Models\City;
@@ -23,8 +24,10 @@ class SettingController extends Controller
 
     public function departements(Request $request)
     {
-        $departements = Departement::all();
-        return Helpers::success($departements);
+         $departements = Departement::with('cities')->get();
+
+        // On passe la collection dans la ressource pour formater le JSON proprement
+        return Helpers::success(DepartementResource::collection($departements));
     }
     public function notifications(Request $request)
     {

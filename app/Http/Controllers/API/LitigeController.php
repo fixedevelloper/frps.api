@@ -135,25 +135,27 @@ class LitigeController extends Controller
 
     /**
      * Détail d'un litige
+     * @param Litige $litige
+     * @return
      */
     public function show(Litige $litige)
     {
-
-        $litige->load('commande.customer.image');
+        $litige->load(['commande.customer', 'messages']);
 
         return Helpers::success([
             'id' => $litige->id,
             'order_id' => $litige->commande?->id,
-            'reference' => $litige->commande?->reference,
-            'type' => $litige->type,
-            'description' => $litige->description,
-            'status' => $litige->stringStatus->value,
-             'status_class' => $litige->stringStatus->class,
-            'photos' => $litige->photos,
-            'submitted_at' => $litige->submitted_at,
-            'customer_name' => $litige->user->name
-        ]);
-    }
+        'reference' => $litige->commande?->reference,
+        'type' => $litige->type,
+        'description' => $litige->description,
+        'status' => $litige->stringStatus->value,
+        'status_class' => $litige->stringStatus->class,
+        'photos' => $litige->photos, // Correspond à proofs ou preuves dans l'UI
+        'submitted_at' => $litige->submitted_at,
+        'customer_name' => $litige->user->name,
+        'messages' => $litige->messages
+    ]);
+}
 
 
     /**

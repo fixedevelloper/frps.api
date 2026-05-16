@@ -119,10 +119,10 @@
     <tr>
         <td class="info-box">
             <div class="info-title">Émetteur</div>
-            <strong>VOTRE ENTREPRISE SARL</strong><br>
-            Rue de l'Industrie, Douala, Cameroun<br>
-            Contact : +237 600 000 000<br>
-            Email : contact@votre-entreprise.com
+            <strong>FRPS - AD</strong><br>
+            Sis: Interieur hospital regional de ngaoundéré<br>
+            Contact : +237 699 087 986<br>
+            Email : inf@vfrps-ad.cm
         </td>
         <td style="width: 10%;"></td>
         <td class="info-box">
@@ -186,7 +186,7 @@
 </div>
 
 <div class="footer">
-    MGNET - RCCM: RC/NGD/202X/B/XXXX - Identifiant Unique: XXXXXXXXXX<br>
+    MGNET - BP: 554 Ngaoundéré - Identifiant Unique: M121012429092J<br>
     Merci pour votre confiance.
 </div>
 

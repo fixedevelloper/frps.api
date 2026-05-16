@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\File;
@@ -456,17 +457,24 @@ class OrderController extends Controller
         try {
             return DB::transaction(function () use ($commande, $status) {
                 switch ($status) {
-                    case 3:
+                    case 2:
                         Notification::route('mail', $commande->customer->email)->notify(new NewOrderNotification($commande));
                         break;
 
-                    case 4:
+                    case 3:
+                        logger($status);
                         $this->generateProformat($commande);
                         if ($commande->customer && $commande->customer->email) {
                             $commande->customer->notify(new ProformaGenerated($commande));
                         }
                         break;
+                    case 5:
 
+                        $this->generateFacture($commande);
+                        if ($commande->customer && $commande->customer->email) {
+                            $commande->customer->notify(new ProformaGenerated($commande));
+                        }
+                        break;
                     case 7:
                         // Décrémentation du stock pour chaque article de la commande
                         foreach ($commande->products as $item) {
@@ -674,6 +682,164 @@ class OrderController extends Controller
 
         return Helpers::success([
             'url'       => $response['data']['links']['paymentAuthUrl'],
+            'amount'    => $montantFinal,
+            'discount'  => $discount,
+            'remaining' => $nouveauReste
+        ]);
+
+    } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Erreur Paiement: " . $e->getMessage());
+            return Helpers::error("Erreur système : " . $e->getMessage());
+        }
+    }
+    public function paiementFactureMobile(Request $request)
+    {
+        DB::beginTransaction();
+
+        try {
+            /*
+            |--------------------------------------------------------------------------
+            | 1. Validation des entrées
+            |--------------------------------------------------------------------------
+            */
+            $request->validate([
+                'order_id'     => ['required', 'exists:commandes,id'],
+                'amount'       => ['required', 'numeric', 'min:0'],
+                'methodPayment'=> ['required'],
+                'advantage_id' => ['nullable', 'exists:advantages,id']
+            ]);
+
+            $commande = Commande::findOrFail($request->order_id);
+
+            /*
+            |--------------------------------------------------------------------------
+            | 2. Vérification d'avantage existant (Contrainte demandée)
+            |--------------------------------------------------------------------------
+            | On vérifie si la commande a déjà un avantage lié dans la table pivot
+            */
+            if ($request->filled('advantage_id')) {
+                $hasAdvantage = DB::table('commande_advantages')
+                    ->where('commande_id', $commande->id)
+                    ->exists();
+
+                if ($hasAdvantage) {
+                    return Helpers::error("Cette commande bénéficie déjà d'un avantage. Les remises ne sont pas cumulables.");
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | 3. Initialisation des variables de calcul
+            |--------------------------------------------------------------------------
+            */
+            $montantInitial = (float) $commande->rest_to_pay;
+            $discount       = 0;
+            $montantFinal   = $montantInitial;
+            $advantage      = null;
+
+            /*
+            |--------------------------------------------------------------------------
+            | 4. Logique de calcul de l'avantage
+            |--------------------------------------------------------------------------
+            */
+            if ($request->filled('advantage_id')) {
+                $advantage = Advantage::findOrFail($request->advantage_id);
+
+                if (!$advantage->active) {
+                    return Helpers::error("Cet avantage est actuellement désactivé.");
+                }
+
+                switch ($advantage->type) {
+                    case 'remise':
+                        $discount = $advantage->is_percentage
+                            ? ($montantInitial * $advantage->value) / 100
+                            : $advantage->value;
+                        $montantFinal = $montantInitial - $discount;
+                        break;
+
+                    case 'bon_reduction':
+                        $discount = $advantage->value;
+                        $montantFinal = $montantInitial - $discount;
+                        break;
+
+                    case 'paiement_differe':
+                        // Ici on calcule ce qui doit être payé immédiatement
+                        $montantFinal = ($montantInitial * $advantage->percentage_paid) / 100;
+                        // Le reste reste dans 'rest_to_pay' après soustraction du montant payé
+                        break;
+                }
+            }
+
+            // Sécurité : Le montant final ne peut pas être négatif
+            $montantFinal = max($montantFinal, 0);
+
+            /*
+            |--------------------------------------------------------------------------
+            | 5. Vérification de l'intégrité du montant
+            |--------------------------------------------------------------------------
+            */
+            if (round((float)$request->amount, 2) !== round($montantFinal, 2)) {
+                // return Helpers::error("Le montant envoyé ({$request->amount}) ne correspond pas au calcul attendu ({$montantFinal}).");
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | 6. Initialisation du paiement Tranzak
+            |--------------------------------------------------------------------------
+            */
+            $reference = 'FRPS-' . Str::upper(Str::random(10));
+
+            $url =  URL::route('payment.pay',['reference' => $reference]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | 7. Enregistrement et mise à jour
+            |--------------------------------------------------------------------------
+            */
+            $paiement = Paiement::create([
+                'reference'       =>  $reference,
+                'commande_id'     => $commande->id,
+                'montant'         => $montantFinal,
+                'methode'         => $request->methodPayment,
+                'status'          => 'pending',
+                'etat'            => Helper::PAIEMENTETATCOMPLET,
+                'date_paiement'   => now(),
+                'advantage_id'    => $advantage?->id,
+            'discount_amount' => $discount
+        ]);
+
+        // Mise à jour du reste à payer sur la commande
+        $nouveauReste = max($commande->rest_to_pay - $montantFinal - $discount, 0);
+
+        $commande->update([
+            'status'          => Helper::STATUSPROCESSING,
+            'rest_to_pay'     => $nouveauReste,
+            'discount_amount' => $commande->discount_amount + $discount
+        ]);
+
+        // Historique de l'avantage (Table Pivot)
+        if ($advantage) {
+            $commande->advantages()->attach($advantage->id, [
+                'amount' => $discount,
+                'created_at' => now()
+            ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 8. Bordereau (si premier paiement)
+        |--------------------------------------------------------------------------
+        */
+        if (($commande->total == $commande->rest_to_pay + $montantFinal + $discount)) {
+            $this->generateBordereau($commande);
+        }
+
+        DB::commit();
+
+        return Helpers::success([
+            'mode'=>$request->methodPayment,
+            'url'       => $url,
             'amount'    => $montantFinal,
             'discount'  => $discount,
             'remaining' => $nouveauReste

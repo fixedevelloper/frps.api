@@ -32,6 +32,7 @@ class Helper
     const METHODCHECK    = 1;
     const METHODMTN     = 2;
     const METHODOM     = 3;
+    const METHODCASH     = 4;
     const PAIEMENTETATPARTIEL     = 1;
     const PAIEMENTETATCOMPLET     = 2;
     const OPERATIONTRANSFERT     = "TRANSFER";

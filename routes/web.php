@@ -45,6 +45,7 @@ Route::get('/test-mailjet-api', function () {
         "data" => $response->getData(),
     ];
 });
+Route::get('/payment/pay', [PaymentController::class, 'pay'])->name('payment.pay');
 Route::get('/payment/success', [PaymentController::class, 'success']);
 Route::get('/payment/cancel', [PaymentController::class, 'failed']);
 Route::post('/tranzak/webhook', [TranzakWebhookController::class, 'handle']);

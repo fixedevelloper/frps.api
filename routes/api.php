@@ -1,23 +1,32 @@
 <?php
 
+use App\Http\Controllers\API\AdvantageController;
+use App\Http\Controllers\API\auth\AuthController;
+use App\Http\Controllers\API\auth\ProfilController;
+use App\Http\Controllers\API\CatalogueController;
+use App\Http\Controllers\API\CustomerController;
+use App\Http\Controllers\API\DashboardController;
+use App\Http\Controllers\API\EnterStockController;
+use App\Http\Controllers\API\LitigeController;
+use App\Http\Controllers\API\LitigeMessageController;
+use App\Http\Controllers\API\LivraisonController;
+use App\Http\Controllers\API\OrderController;
+use App\Http\Controllers\API\PasswordController;
 use App\Http\Controllers\API\RolePermissionController;
+use App\Http\Controllers\API\SettingController;
+use App\Http\Controllers\API\TransporteurController;
+use App\Http\Controllers\API\UserController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\{
-    JWTAuthController, PasswordController, UserController,
-    CatalogueController, OrderController, CustomerController,
-    LitigeController, LitigeMessageController, EnterStockController,
-    SettingController, LivraisonController, TransporteurController,
-    DashboardController, AdvantageController
-};
+
 
 /*
 |--------------------------------------------------------------------------
 | ROUTES PUBLIQUES (Sans Auth)
 |--------------------------------------------------------------------------
 */
-Route::post('register', [JWTAuthController::class, 'register']);
-Route::post('login', [JWTAuthController::class, 'loginCustomer']);
-Route::post('login_admin', [JWTAuthController::class, 'login']);
+//Route::post('register', [JWTAuthController::class, 'register']);
+Route::post('login', [AuthController::class, 'login'])->name('login');
+Route::post('login_admin', [AuthController::class, 'loginAdmin']);
 
 Route::prefix('password')->group(function () {
     Route::post('forgot', [PasswordController::class, 'sendResetLinkEmail']);
@@ -41,11 +50,14 @@ Route::get('/user-permissions', function() {
 | ROUTES PROTÉGÉES (Middleware JWT & Verified)
 |--------------------------------------------------------------------------
 */
-Route::middleware(['jwt.verify', 'jwt.auth', 'verified'])->group(function () {
+
+Route::middleware('auth:sanctum')->group(function () {
 
     // --- AUTH & PROFILE ---
-    Route::get('user', [JWTAuthController::class, 'getUser']);
-    Route::post('logout', [JWTAuthController::class, 'logout']);
+    Route::get('profile', [ProfilController::class, 'profile']);
+    Route::post('change_password', [ProfilController::class, 'changePassword']);
+    Route::post('profile/update', [ProfilController::class, 'updateProfile']);
+    Route::post('logout', [AuthController::class, 'logout']);
 
     // --- DASHBOARD & ANALYTICS ---
     Route::prefix('dashboard')->group(function () {
@@ -88,6 +100,7 @@ Route::middleware(['jwt.verify', 'jwt.auth', 'verified'])->group(function () {
         Route::put('{id}/assign-transporteur', [OrderController::class, 'assignTransporteur']);
     });
     Route::post('paiements', [OrderController::class, 'paiementFacture']);
+    Route::post('simulation/paiements', [OrderController::class, 'paiementFactureMobile']);
 
     // --- LITIGES & RETOURS ---
     Route::prefix('litiges')->group(function () {

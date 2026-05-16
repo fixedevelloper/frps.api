@@ -94,4 +94,5 @@ class Litige extends Model
 
         return $types[$this->type] ?? 'Autre';
     }
+
 }

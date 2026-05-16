@@ -201,8 +201,8 @@ class CatalogueController extends Controller
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('intitule', 'LIKE', "%{$search}%")
-                    ->orWhere('referenceProduit', 'LIKE', "%{$search}%")
-                    ->orWhere('numeroLot', 'LIKE', "%{$search}%");
+                    ->orWhere('reference', 'LIKE', "%{$search}%")
+                    ->orWhere('lot', 'LIKE', "%{$search}%");
             });
         }
 
