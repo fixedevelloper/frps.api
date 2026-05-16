@@ -42,7 +42,9 @@ class RoleAndPermissionSeeder extends Seeder
 
         // 3. CRÉATION OU MISE À JOUR DES RÔLES
         // Super Admin : a tous les droits
-        $adminRole = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        $adminRole = Role::updateOrCreate(
+            ['name' => 'admin', 'guard_name' => 'web']
+        );
 
         // syncPermissions est plus sûr que givePermissionTo car il écrase et remplace (évite les doublons)
         $adminRole->syncPermissions(Permission::all());

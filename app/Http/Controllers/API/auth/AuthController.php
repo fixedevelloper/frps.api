@@ -55,12 +55,13 @@ class AuthController extends Controller
 
         // Création du token Sanctum
         $token = $user->createToken('mobile-app')->plainTextToken;
-
+        $permissions = $user->getAllPermissions()->pluck('name');
         return Helpers::success([
             'message' => 'Connexion réussie',
             'token' => $token,
             'phone' => $user->phone,
-            'username' => $user->name
+            'username' => $user->name,
+            'permissions' => $permissions
         ]);
     }
 
