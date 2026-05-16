@@ -56,6 +56,10 @@ class Paiement extends Model
             Helper::METHODCHECK => [
                 'class' => 'badge badge-danger',
                 'value' => 'Carte bancaire'
+            ],
+            Helper::METHODCASH => [
+                'class' => 'badge badge-success',
+                'value' => 'Cash'
             ]
         ];
 

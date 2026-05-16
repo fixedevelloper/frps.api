@@ -94,12 +94,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('orders')->group(function () {
         Route::get('/', [OrderController::class, 'orders']);
         Route::post('/', [OrderController::class, 'storeOrder']);
+
         Route::get('customer', [OrderController::class, 'ordersCustomer']);
         Route::get('{id}', [OrderController::class, 'orderDetail']);
         Route::get('{id}/{status}/status', [OrderController::class, 'changeStatus']);
         Route::post('update-item', [OrderController::class, 'updateQuantity']);
         Route::put('{id}/assign-transporteur', [OrderController::class, 'assignTransporteur']);
     });
+    Route::post('admin/paiements', [OrderController::class, 'paiementFactureAdmin']);
     Route::post('paiements', [OrderController::class, 'paiementFacture']);
     Route::post('simulation/paiements', [OrderController::class, 'paiementFactureMobile']);
 
@@ -115,6 +117,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('returns')->group(function () {
         Route::get('/', [OrderController::class, 'getReturns']);
         Route::post('/', [OrderController::class, 'storeReturn']);
+        Route::post('/validate', [OrderController::class, 'updateStatusReturn']);
         Route::get('customer', [CustomerController::class, 'getReturns']);
         Route::delete('{id}', [CustomerController::class, 'destroyReturn']);
     });

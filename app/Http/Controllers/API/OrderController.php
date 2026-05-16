@@ -273,8 +273,8 @@ class OrderController extends Controller
             'statusValue' => $commande->status,
             'date' => $commande->created_at,
             'customer_image' => $commande->customer->image,
-            'facture_pdf' => $commande->facture_pdf,
-            'proforma_pdf' => config('app.url') . $commande->proforma_pdf,
+            'facture_pdf'  => $commande->facture_url,
+            'proforma_pdf' => $commande->proforma_url,
             'customer_name' => $commande->customer
                 ? $commande->customer->name
                 : null,
@@ -315,6 +315,7 @@ class OrderController extends Controller
                     'amount' => $item->montant,
                     'order_id' => $item->commande_id,
                     'method' => $item->stringMethode->value,
+                    'methodClass' => $item->stringMethode->class,
                     'status' => $item->status,
                     'date' => $item->date_paiement,
                 ];
@@ -386,6 +387,60 @@ class OrderController extends Controller
         return response()->json(['message' => 'Problème signalé avec succès'], 201);
     }
 
+    public function updateStatusReturn(Request $request)
+    {
+        // 1. Validation des données entrantes pour correspondre à notre logique Angular
+        $validator = Validator::make($request->all(), [
+            'id'     => 'required|exists:return_requests,id', // Remplacez 'return_requests' par le nom de votre table
+            'status' => 'required|in:Completed,Rejected',
+            'reason' => 'required_if:status,Rejected|nullable|string|min:10'
+        ], [
+            'id.exists'         => 'Le litige spécifié est introuvable.',
+            'status.in'         => 'Le statut doit être "Completed" ou "Rejected".',
+            'reason.required_if' => 'Un motif est obligatoire pour refuser un retour.',
+            'reason.min'        => 'Le motif de refus doit contenir au moins 10 caractères.'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors'  => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // 2. Récupération de la demande de retour
+            $returnRequest = ReturnRequest::findOrFail($request->id);
+
+            // 3. Mise à jour des champs
+            $returnRequest->status = $request->status;
+
+            // Si c'est un refus, on enregistre le motif, sinon on s'assure qu'il est nul
+            if ($request->status === 'Rejected') {
+                $returnRequest->reason = $request->reason;
+            } else {
+                $returnRequest->reason = null;
+            }
+            $returnRequest->date_traitement = new \DateTime('now');
+            $returnRequest->save();
+
+            // 4. (Optionnel) Déclencher un événement ici pour envoyer un mail automatique au client
+            // event(new ReturnStatusUpdatedEvent($returnRequest));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Le statut du retour a été mis à jour avec succès.',
+                'data'    => $returnRequest
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur interne est survenue lors de la mise à jour.',
+                'error'   => $e->getMessage()
+            ], 500);
+        }
+    }
     public function storeReturn(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -712,6 +767,14 @@ class OrderController extends Controller
 
             $commande = Commande::findOrFail($request->order_id);
 
+            if ($request->methodPayment=4){
+                return Helpers::success([
+                    'mode'=>$request->methodPayment,
+                    'amount'    => $commande->total,
+                    'discount'  => 0.0,
+                    'remaining' => 0.0
+                ]);
+            }
             /*
             |--------------------------------------------------------------------------
             | 2. Vérification d'avantage existant (Contrainte demandée)
@@ -848,6 +911,106 @@ class OrderController extends Controller
     } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Erreur Paiement: " . $e->getMessage());
+            return Helpers::error("Erreur système : " . $e->getMessage());
+        }
+    }
+    public function paiementFactureAdmin(Request $request)
+    {
+        DB::beginTransaction();
+
+        try {
+            $request->validate([
+                'order_id'     => ['required', 'exists:commandes,id'],
+                'amount'       => ['required', 'numeric', 'min:1'], // On ne paie pas 0
+                'advantage_id' => ['nullable', 'exists:advantages,id']
+            ]);
+
+            $commande = Commande::lockForUpdate()->findOrFail($request->order_id);
+
+            // 1. Vérification des avantages cumulés
+            if ($request->filled('advantage_id')) {
+                $hasAdvantage = DB::table('commande_advantages')
+                    ->where('commande_id', $commande->id)
+                    ->exists();
+
+                if ($hasAdvantage) {
+                    return Helpers::error("Cette commande bénéficie déjà d'un avantage.");
+                }
+            }
+
+            $montantInitial = (float) $commande->rest_to_pay;
+            $discount       = 0;
+            $advantage      = null;
+
+            // 2. Calcul de la remise si applicable
+            if ($request->filled('advantage_id')) {
+                $advantage = Advantage::findOrFail($request->advantage_id);
+                if (!$advantage->active) return Helpers::error("Avantage désactivé.");
+
+                if ($advantage->type === 'remise') {
+                    $discount = $advantage->is_percentage
+                        ? ($montantInitial * $advantage->value) / 100
+                        : $advantage->value;
+                } elseif ($advantage->type === 'bon_reduction') {
+                    $discount = $advantage->value;
+                }
+            }
+
+            // 3. Validation du montant envoyé par le frontend
+            // Le montant envoyé doit être ce que le client donne réellement en cash.
+            $montantRecu = (float) $request->amount;
+
+            if ($montantRecu > ($montantInitial - $discount)) {
+                return Helpers::error("Le montant dépasse le reste à payer (Max attendu: " . ($montantInitial - $discount) . ")");
+            }
+
+            // 4. Enregistrement du Paiement
+            $reference = 'CASH-' . Str::upper(Str::random(10));
+
+            $paiement = Paiement::create([
+                'reference'       => $reference,
+                'commande_id'     => $commande->id,
+                'montant'         => $montantRecu,
+                'methode'         => Helper::METHODCASH, // Plus explicite que "4"
+                'status'          => Helper::STATUSSUCCESS,
+                'etat'            => Helper::PAIEMENTETATCOMPLET,
+                'date_paiement'   => now(),
+                'advantage_id'    => $advantage?->id,
+            'discount_amount' => $discount
+        ]);
+
+        // 5. Mise à jour de la commande
+        $nouveauReste = max($commande->rest_to_pay - $montantRecu - $discount, 0);
+
+        // La commande ne passe en SUCCESS que si tout est payé
+        $nouveauStatut = ($nouveauReste <= 0) ? Helper::STATUSSUCCESS : $commande->status;
+
+        $commande->update([
+            'status'          => $nouveauStatut,
+            'rest_to_pay'     => $nouveauReste,
+            'discount_amount' => $commande->discount_amount + $discount
+        ]);
+
+        // 6. Historique Pivot
+        if ($advantage && $discount > 0) {
+            $commande->advantages()->attach($advantage->id, ['amount' => $discount]);
+        }
+
+        // 7. Génération de facture automatique si solde à zéro
+        if ($nouveauReste <= 0) {
+            $this->generateFacture($commande);
+        }
+
+        DB::commit();
+
+        return Helpers::success([
+            'payment'   => $paiement,
+            'remaining' => $nouveauReste,
+            'status'    => $nouveauStatut
+        ], "Paiement cash enregistré avec succès.");
+
+    } catch (\Exception $e) {
+            DB::rollBack();
             return Helpers::error("Erreur système : " . $e->getMessage());
         }
     }

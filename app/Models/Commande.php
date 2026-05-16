@@ -96,4 +96,46 @@ class Commande extends Model
             ]);
     }
 
+    /**
+     * Calcul du montant total HT de la commande
+     */
+    public function getTotalHtAttribute()
+    {
+        return $this->products->sum(function($item) {
+            return $item->quantite * $item->product->price;
+        });
+    }
+
+    /**
+     * Calcul du montant de la TVA (Exemple à 19.25%)
+     */
+    public function getTvaAmountAttribute()
+    {
+        // Vous pouvez ajouter une condition ici (si client assujetti à la TVA)
+        return $this->total_ht * 0.1925;
+    }
+    /**
+     * URL complète de la facture
+     */
+    public function getFactureUrlAttribute()
+    {
+        if (!$this->facture_pdf) return null;
+
+        // Si le chemin commence déjà par http, on le retourne tel quel
+        if (str_starts_with($this->facture_pdf, 'http')) return $this->facture_pdf;
+
+        return asset($this->facture_pdf);
+    }
+
+    /**
+     * URL complète de la proforma
+     */
+    public function getProformaUrlAttribute()
+    {
+        if (!$this->proforma_pdf) return null;
+
+        if (str_starts_with($this->proforma_pdf, 'http')) return $this->proforma_pdf;
+
+        return asset($this->proforma_pdf);
+    }
 }
