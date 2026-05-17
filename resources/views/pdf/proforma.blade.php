@@ -122,7 +122,7 @@
             <strong>FRPS - AD</strong><br>
             Sis: Interieur hospital regional de ngaoundéré<br>
             Contact : +237 699 087 986<br>
-            Email : inf@vfrps-ad.cm
+            Email : info@frps-ad.cm
         </td>
         <td style="width: 10%;"></td>
         <td class="info-box">
@@ -138,8 +138,7 @@
 <table class="main-table" style="width: 100%; border-collapse: collapse; margin-vertical: 15px;">
     <thead>
     <tr style="background-color: #f8f9fa; text-transform: uppercase; font-size: 11px; color: #555;">
-        <th style="width: 35%; text-align: left; padding: 8px;">Désignation</th>
-        <th style="width: 12%; text-align: center; padding: 8px;">N° Lot</th>
+        <th style="width: 47%; text-align: left; padding: 8px;">Désignation</th>
         <th style="width: 13%; text-align: center; padding: 8px;">D. Pérempt.</th>
         <th style="width: 12%; text-align: center; padding: 8px;">Financement</th>
         <th style="width: 8%; text-align: center; padding: 8px;">Qté</th>
@@ -163,12 +162,6 @@
                 <strong style="color: #2c3e50; display: block; font-size: 13px;">{{ $article->product->intitule }}</strong>
                 <small style="color: #7f8c8d; font-size: 11px;">Ref: {{ $article->product->reference }}</small>
             </td>
-
-            <!-- N° Lot extrait dynamiquement selon la stratégie appliquée (FIFO/LIFO) -->
-            <td style="padding: 10px 8px; text-align: center; vertical-align: middle; font-size: 12px; font-family: monospace;">
-                {{ $lotPhysique->num_lot ?? '-' }}
-            </td>
-
             <!-- Date de Péremption rattachée au lot spécifique extrait -->
             <td style="padding: 10px 8px; text-align: center; vertical-align: middle; font-size: 12px;">
                 {{ isset($lotPhysique->date_peremption) ? date('d/m/Y', strtotime($lotPhysique->date_peremption)) : '-' }}
