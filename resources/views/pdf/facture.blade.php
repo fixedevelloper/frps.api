@@ -2,149 +2,237 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <title>Facture #{{ $commande->reference }}</title>
     <style>
-        @page { margin: 50px; }
+        @page { margin: 40px 50px 60px 50px; }
         body {
             font-family: 'Helvetica', 'Arial', sans-serif;
             font-size: 11px;
             color: #333;
             line-height: 1.5;
         }
-        /* Header & Logo */
-        .header-table { width: 100%; border: none; margin-bottom: 40px; }
-        .logo { width: 150px; filter: grayscale(100%); }
-        .company-info { text-align: right; font-size: 10px; color: #7f8c8d; }
-
-        /* Titre et Infos Client */
-        .invoice-title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #2c3e50;
-            text-transform: uppercase;
-            border-bottom: 2px solid #2c3e50;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-        }
-        .info-section { width: 100%; margin-bottom: 30px; }
-        .info-box { width: 50%; vertical-align: top; }
-        .info-label { color: #7f8c8d; text-transform: uppercase; font-size: 9px; font-weight: bold; margin-bottom: 5px; }
-
-        /* Tableau des produits */
-        table.items-table {
+        /* En-tête & Logo */
+        .header-table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 30px;
         }
-        table.items-table th {
+        .logo { max-width: 160px; height: auto; }
+        .company-info {
+            text-align: right;
+            font-size: 10px;
+            color: #7f8c8d;
+            line-height: 1.4;
+        }
+
+        /* Titre Document */
+        .invoice-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+            text-transform: uppercase;
+            border-bottom: 2px solid #2c3e50;
+            margin-bottom: 25px;
+            padding-bottom: 5px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Blocs d'informations */
+        .info-section {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .info-box {
+            width: 50%;
+            vertical-align: top;
+        }
+        .info-label {
+            color: #7f8c8d;
+            text-transform: uppercase;
+            font-size: 9px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        /* Structure du Tableau Principal */
+        table.main-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        table.main-table th {
             background: #2c3e50;
             color: white;
-            padding: 10px;
+            padding: 10px 8px;
             text-transform: uppercase;
-            font-size: 10px;
-            border: none;
+            font-size: 9px;
+            font-weight: bold;
         }
-        table.items-table td {
-            padding: 12px 10px;
+        table.main-table td {
+            padding: 10px 8px;
             border-bottom: 1px solid #ecf0f1;
+            vertical-align: middle;
         }
+
+        /* Alignements & Utilitaires */
         .text-right { text-align: right; }
         .text-center { text-align: center; }
+        .text-left { text-align: left; }
 
-        /* Totaux */
-        .totals-container { width: 100%; }
-        .totals-table { width: 40%; margin-left: auto; border-collapse: collapse; }
-        .totals-table td { padding: 8px; border-bottom: 1px solid #ecf0f1; }
-        .total-row { background: #f8f9fa; font-weight: bold; font-size: 13px; color: #2c3e50; }
-        .total-row td { border-bottom: 2px solid #2c3e50; }
+        /* Section des totaux */
+        .totals-container {
+            width: 100%;
+            margin-top: 20px;
+        }
+        .totals-table {
+            width: 40%;
+            margin-left: auto;
+            border-collapse: collapse;
+        }
+        .totals-table td {
+            padding: 8px;
+            border-bottom: 1px solid #ecf0f1;
+            font-size: 11px;
+        }
+        .total-row {
+            background: #f8f9fa;
+            font-weight: bold;
+            font-size: 13px;
+            color: #2c3e50;
+        }
+        .total-row td {
+            border-top: 1px solid #2c3e50;
+            border-bottom: 2px solid #2c3e50;
+        }
 
+        .rest-pay {
+            text-align: right;
+            color: #c0392b;
+            margin-top: 15px;
+            font-size: 12px;
+        }
+
+        /* Pied de page sécurisé pour PDF */
         .footer {
             position: fixed;
-            bottom: 0;
-            width: 100%;
+            bottom: -30px;
+            left: 0;
+            right: 0;
+            height: 40px;
             text-align: center;
             font-size: 9px;
-            color: #bdc3c7;
+            color: #95a5a6;
             border-top: 1px solid #ecf0f1;
-            padding-top: 10px;
+            padding-top: 8px;
+            line-height: 1.4;
         }
     </style>
 </head>
 <body>
 
+<!-- En-tête de la facture -->
 <table class="header-table">
     <tr>
-        <td>
+        <td class="text-left">
             <img src="{{ public_path('images/logo.png') }}" class="logo">
         </td>
         <td class="company-info">
-            <strong>FRPS - AD</strong><br>
-            Sis: Interieur hospital regional de ngaoundéré<br>
+            <strong style="color: #2c3e50; font-size: 12px;">FRPS - AD</strong><br>
+            Sis: Intérieur Hôpital Régional de Ngaoundéré<br>
             Contact : +237 699 087 986<br>
-            Email : inf@vfrps-ad.cm
+            Email : info@frps-ad.cm
         </td>
     </tr>
 </table>
 
 <div class="invoice-title">Facture #{{ $commande->reference }}</div>
 
+<!-- Section de facturation & métadonnées -->
 <table class="info-section">
     <tr>
         <td class="info-box">
             <div class="info-label">Facturé à :</div>
-            <strong>{{ $commande->customer->name }}</strong><br>
-            {{ $commande->adresse_livraison ?? $commande->customer->address }}<br>
-            Tél : {{ $commande->customer->phone ?? 'N/A' }}
+            <strong style="font-size: 13px; color: #2c3e50;">{{ $commande->customer->name }}</strong><br>
+            <span style="color: #555;">
+                {{ $commande->adresse_livraison ?? $commande->customer->address }}<br>
+                Tél : {{ $commande->customer->phone ?? 'N/A' }}
+            </span>
         </td>
         <td class="info-box text-right">
-            <div class="info-label">Détails :</div>
-            <strong>Date :</strong> {{ now()->format('d/m/Y') }}<br>
-            <strong>Statut :</strong> {{ $commande->string_status->value }}<br>
+            <div class="info-label">Détails du document :</div>
+            <strong>Date d'émission :</strong> {{ now()->format('d/m/Y') }}<br>
+            <strong>Statut :</strong> {{ $commande->string_status->value ?? 'N/A' }}<br>
             <strong>Mode de règlement :</strong> Par virement / Espèces
         </td>
     </tr>
 </table>
 
-<table class="items-table">
+<!-- Tableau des articles -->
+<table class="main-table">
     <thead>
     <tr>
-        <th style="text-align: left;">Désignation</th>
-        <th style="width: 10%;">Qté</th>
-        <th style="width: 20%; text-align: right;">Prix Unitaire</th>
-        <th style="width: 20%; text-align: right;">Montant Total</th>
+        <th style="width: 35%; text-align: left;">Désignation</th>
+        <th style="width: 12%; text-align: center;">N° Lot</th>
+        <th style="width: 13%; text-align: center;">D. Pérempt.</th>
+        <th style="width: 12%; text-align: center;">Financement</th>
+        <th style="width: 8%; text-align: center;">Qté</th>
+        <th style="width: 10%; text-align: right;">P. Unitaire</th>
+        <th style="width: 10%; text-align: right;">P. Total</th>
     </tr>
     </thead>
     <tbody>
-    @php $totalCalculé = 0; @endphp
+    @php $total = 0; @endphp
     @foreach($commande->products as $article)
         @php
             $sousTotal = $article->quantite * $article->product->price;
-            $totalCalculé += $sousTotal;
+            $total += $sousTotal;
         @endphp
         <tr>
-            <td>
-                <strong>{{ $article->product->intitule }}</strong><br>
-                <span style="color: #7f8c8d; font-size: 9px;">REF: {{ $article->product->referenceProduit }}</span>
+            <!-- Désignation -->
+            <td class="text-left">
+                <strong style="color: #2c3e50; display: block; font-size: 12px;">{{ $article->product->intitule }}</strong>
+                <small style="color: #7f8c8d;">Ref: {{ $article->product->reference }}</small>
             </td>
-            <td class="text-center">{{ $article->quantite }}</td>
+
+            <!-- N° Lot -->
+            <td class="text-center">{{ $article->product->lot ?? '-' }}</td>
+
+            <!-- Date de Péremption -->
+            <td class="text-center">
+                {{ $article->product->date_peremption ? date('d/m/Y', strtotime($article->product->date_peremption)) : '-' }}
+            </td>
+
+            <!-- Financement -->
+            <td class="text-center">{{ $article->product->financement ?? '-' }}</td>
+
+            <!-- Quantité -->
+            <td class="text-center" style="font-weight: bold;">{{ $article->quantite }}</td>
+
+            <!-- Prix Unitaire -->
             <td class="text-right">{{ number_format($article->product->price, 0, ',', ' ') }}</td>
-            <td class="text-right">{{ number_format($sousTotal, 0, ',', ' ') }}</td>
+
+            <!-- Prix Total -->
+            <td class="text-right" style="font-weight: bold; color: #2c3e50;">{{ number_format($sousTotal, 0, ',', ' ') }}</td>
         </tr>
     @endforeach
     </tbody>
 </table>
 
+<!-- Logique de calcul des taxes -->
 @php
     $tauxTVA = 0.1925;
-    $appliquerTVA = false; // À lier à une logique métier si besoin
-    $montantTVA = $appliquerTVA ? $totalCalculé * $tauxTVA : 0;
-    $totalTTC = $totalCalculé + $montantTVA;
+    $appliquerTVA = false; // Ajustez à true si votre business model intègre la TVA
+    $montantTVA = $appliquerTVA ? $total * $tauxTVA : 0;
+    $totalTTC = $total + $montantTVA;
 @endphp
 
+<!-- Bloc de résumé financier -->
 <div class="totals-container">
     <table class="totals-table">
         <tr>
             <td>Total HT</td>
-            <td class="text-right">{{ number_format($totalCalculé, 0, ',', ' ') }} FCFA</td>
+            <td class="text-right">{{ number_format($total, 0, ',', ' ') }} FCFA</td>
         </tr>
         @if($appliquerTVA)
             <tr>
@@ -159,15 +247,17 @@
     </table>
 </div>
 
+<!-- Reliquat éventuel -->
 @if($commande->rest_to_pay > 0)
-    <p style="text-align: right; color: #e74c3c;">
+    <div class="rest-pay">
         <strong>Reste à payer : {{ number_format($commande->rest_to_pay, 0, ',', ' ') }} FCFA</strong>
-    </p>
+    </div>
 @endif
 
+<!-- Pied de page -->
 <div class="footer">
-    <p>  MGNET - BP: 554 Ngaoundéré | Identifiant Unique: M121012429092J</p>
-    <p><em>Merci de votre fidélité. Cette facture tient lieu de preuve d'achat.</em></p>
+    B.p.: 554 N’déré — Tél/Fax: +237 222 25 29 28 — Email: info@frps-ad.cm — N° Cont: M12101243909J<br>
+    <strong>Merci pour votre confiance.</strong>
 </div>
 
 </body>

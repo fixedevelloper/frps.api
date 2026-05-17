@@ -135,13 +135,16 @@
     </tr>
 </table>
 
-<table class="main-table">
+<table class="main-table" style="width: 100%; border-collapse: collapse; margin-vertical: 15px;">
     <thead>
-    <tr>
-        <th style="width: 45%;">Désignation</th>
-        <th style="width: 15%; text-align: center;">Qté</th>
-        <th style="width: 20%; text-align: right;">Prix Unitaire</th>
-        <th style="width: 20%; text-align: right;">Montant</th>
+    <tr style="background-color: #f8f9fa; text-transform: uppercase; font-size: 11px; color: #555;">
+        <th style="width: 35%; text-align: left; padding: 8px;">Désignation</th>
+        <th style="width: 12%; text-align: center; padding: 8px;">N° Lot</th>
+        <th style="width: 13%; text-align: center; padding: 8px;">D. Pérempt.</th>
+        <th style="width: 12%; text-align: center; padding: 8px;">Financement</th>
+        <th style="width: 8%; text-align: center; padding: 8px;">Qté</th>
+        <th style="width: 10%; text-align: right; padding: 8px;">P. Unitaire</th>
+        <th style="width: 10%; text-align: right; padding: 8px;">P. Total</th>
     </tr>
     </thead>
     <tbody>
@@ -151,17 +154,55 @@
             $sousTotal = $article->quantite * $article->product->price;
             $total += $sousTotal;
         @endphp
-        <tr>
-            <td>
-                <strong>{{ $article->product->intitule }}</strong><br>
-                <small style="color: #7f8c8d;">{{ $article->product->referenceProduit }}</small>
+        <tr style="border-bottom: 1px solid #eee;">
+            <!-- Désignation (Aligné à gauche) -->
+            <td style="padding: 10px 8px; text-align: left; vertical-align: middle;">
+                <strong style="color: #2c3e50; display: block; font-size: 13px;">{{ $article->product->intitule }}</strong>
+                <small style="color: #7f8c8d; font-size: 11px;">Ref: {{ $article->product->reference }}</small>
             </td>
-            <td style="text-align: center;">{{ $article->quantite }}</td>
-            <td class="text-right">{{ number_format($article->product->price, 0, ',', ' ') }}</td>
-            <td class="text-right">{{ number_format($sousTotal, 0, ',', ' ') }}</td>
+
+            <!-- N° Lot (Centré) -->
+            <td style="padding: 10px 8px; text-align: center; vertical-align: middle; font-size: 12px;">
+                {{ $article->product->lot ?? '-' }}
+            </td>
+
+            <!-- Date de Péremption (Centré) -->
+            <td style="padding: 10px 8px; text-align: center; vertical-align: middle; font-size: 12px;">
+                {{ $article->product->date_peremption ? date('d/m/Y', strtotime($article->product->date_peremption)) : '-' }}
+            </td>
+
+            <!-- Financement (Centré) -->
+            <td style="padding: 10px 8px; text-align: center; vertical-align: middle; font-size: 12px;">
+                {{ $article->product->financement ?? '-' }}
+            </td>
+
+            <!-- Quantité (Centré) -->
+            <td style="padding: 10px 8px; text-align: center; vertical-align: middle; font-weight: 600; font-size: 13px;">
+                {{ $article->quantite }}
+            </td>
+
+            <!-- Prix Unitaire (Aligné à droite) -->
+            <td style="padding: 10px 8px; text-align: right; vertical-align: middle; font-size: 12px;">
+                {{ number_format($article->product->price, 0, ',', ' ') }}
+            </td>
+
+            <!-- Prix Total (Aligné à droite) -->
+            <td style="padding: 10px 8px; text-align: right; vertical-align: middle; font-weight: bold; color: #2c3e50; font-size: 13px;">
+                {{ number_format($sousTotal, 0, ',', ' ') }}
+            </td>
         </tr>
     @endforeach
     </tbody>
+
+    <!-- Ligne optionnelle pour afficher le Total global en bas de tableau -->
+{{--    <tfoot>
+    <tr style="background-color: #fdfdfd; border-top: 2px solid #bdc3c7;">
+        <td colspan="6" style="padding: 12px 8px; text-align: right; font-weight: bold; text-transform: uppercase; font-size: 12px;">Montant Total Global :</td>
+        <td style="padding: 12px 8px; text-align: right; font-weight: bold; color: #e74c3c; font-size: 14px;">
+            {{ number_format($total, 0, ',', ' ') }}
+        </td>
+    </tr>
+    </tfoot>--}}
 </table>
 
 <div class="total-box">
@@ -186,7 +227,7 @@
 </div>
 
 <div class="footer">
-    MGNET - BP: 554 Ngaoundéré - Identifiant Unique: M121012429092J<br>
+    B.p.: 554 N’déré Tél/Fax .: +237 222 25 29 28 Email: info@frps-ad.cm N Cont: M12101243909J<br>
     Merci pour votre confiance.
 </div>
 

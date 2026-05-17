@@ -135,7 +135,7 @@ class OrderController extends Controller
             'customer',
             'products',
             'litiges'
-        ])->paginate($perPage, ['*'], 'page', $page);
+        ])->orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
 
         $orders = $paginator->through(function ($commande) {
             return [
@@ -972,7 +972,7 @@ class OrderController extends Controller
                 'commande_id'     => $commande->id,
                 'montant'         => $montantRecu,
                 'methode'         => Helper::METHODCASH, // Plus explicite que "4"
-                'status'          => Helper::STATUSSUCCESS,
+                'status'          => 'paid',
                 'etat'            => Helper::PAIEMENTETATCOMPLET,
                 'date_paiement'   => now(),
                 'advantage_id'    => $advantage?->id,
