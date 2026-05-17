@@ -782,6 +782,7 @@ class OrderController extends Controller
         // Cas spécifique (par exemple: Cash/Test) - Pas besoin de transaction ici
         if ($request->methodPayment == 4) {
             return Helpers::success([
+                'url'       => '',
                 'mode'      => $request->methodPayment,
                 'amount'    => $commande->total,
                 'discount'  => 0.0,
