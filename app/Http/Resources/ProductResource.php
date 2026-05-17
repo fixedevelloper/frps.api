@@ -16,6 +16,7 @@ class ProductResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $lotPrioritaire = $this->lot_prioritaire;
         return [
             'id' => $this->id,
             'intitule' => $this->intitule,
@@ -35,7 +36,16 @@ class ProductResource extends JsonResource
             'datePeremption' => $this->date_peremption,
             'presentation' => $this->presentation,
             'description' => $this->description,
-            'stock' => $this->stock,
+            'lot_actuel' => $lotPrioritaire ? [
+                'id' => $lotPrioritaire->id,
+                'numeroLot' => $lotPrioritaire->num_lot,
+                'quantiteDisponible' => $lotPrioritaire->quantite_actuelle,
+                'datePeremption' => $lotPrioritaire->date_peremption,
+                'emplacement' => $lotPrioritaire->emplacement,
+            ] : null,
+
+            // Stock global cumulé (Somme de tous les lots disponibles)
+            'stock_total' => (int) $this->stocks()->sum('quantite_actuelle'),
             'status' => $this->publish ? 'publie' : 'En attente',
 
             // Logique simplifiée pour l'image

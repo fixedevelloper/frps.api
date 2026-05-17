@@ -36,7 +36,6 @@ class CatalogueController extends Controller
     {
         $category = Category::findOrFail($id);
 
-        logger($request->all());
         // Validation
         $validated = $request->validate([
             'intitule' => 'required|string|max:255',
@@ -194,7 +193,7 @@ class CatalogueController extends Controller
         $search = $request->input('search');
         $categoryId = $request->input('category_id');
 
-        $query = Product::with(['category', 'image'])
+        $query = Product::with(['category', 'image','stocks'])
             ->where('publish', true);
 
         // 🔍 Recherche

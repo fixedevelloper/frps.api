@@ -25,6 +25,7 @@ use App\Notifications\ProformaGenerated;
 use App\Notifications\ReturnOrderNotification;
 use App\Notifications\SmsNotification;
 use App\Services\PdfService;
+use App\Services\StockService;
 use App\Services\TransactService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -507,7 +508,10 @@ class OrderController extends Controller
 
     public function changeStatus(Request $request, $id, $status)
     {
-        $commande = Commande::with('products.product')->findOrFail($id);
+        $commande = Commande::with([
+            'products.product',
+            'products.product.stocks'
+        ])->findOrFail($id);
 
         try {
             return DB::transaction(function () use ($commande, $status) {
@@ -531,16 +535,30 @@ class OrderController extends Controller
                         }
                         break;
                     case 7:
-                        // Décrémentation du stock pour chaque article de la commande
-                        foreach ($commande->products as $item) {
-                            if ($item->product) {
-                                EnterStock::create([
-                                    'product_id' => $item->product_id,
-                                    'quantity'   => -$item->quantity, // Valeur négative pour décrémenter
-                                    'status'     => Helper::STATUSSUCCESS,
-                                    'reference'  => 'SORTIE-CMD-' . $commande->reference,
-                                ]);
+                        try {
+                            DB::beginTransaction();
+
+                            $serviceStock = app(StockService::class);
+
+                            foreach ($commande->products as $item) {
+                                if ($item->product) {
+                                    // Récupération de la quantité (s'adapte si c'est une table pivot ou non)
+                                    $quantite = $item->pivot->quantite ?? $item->quantite ?? 1;
+
+                                    // Appel de votre service Laravel
+                                    $serviceStock->sortirStock(
+                                        $item->product,
+                                        $quantite,
+                                        "Déstockage automatique - Commande #{$commande->id}"
+                                    );
+                                }
                             }
+
+                            DB::commit();
+                        } catch (\Exception $e) {
+                            DB::rollBack(); // Annule toutes les sorties de stock si une seule échoue !
+                            Log::error("Échec du déstockage de la commande {$commande->id}: " . $e->getMessage());
+                            throw $e;
                         }
                         break;
                 }

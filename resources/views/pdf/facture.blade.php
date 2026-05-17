@@ -187,6 +187,8 @@
         @php
             $sousTotal = $article->quantite * $article->product->price;
             $total += $sousTotal;
+
+           $lotPhysique = $article->product->lot_prioritaire;
         @endphp
         <tr>
             <!-- Désignation -->
@@ -195,12 +197,12 @@
                 <small style="color: #7f8c8d;">Ref: {{ $article->product->reference }}</small>
             </td>
 
-            <!-- N° Lot -->
-            <td class="text-center">{{ $article->product->lot ?? '-' }}</td>
+            <!-- N° Lot extrait du lot spécifique consommé -->
+            <td class="text-center" style="font-family: monospace;">{{ $lotPhysique->num_lot ?? '-' }}</td>
 
-            <!-- Date de Péremption -->
+            <!-- Date de Péremption rattachée au lot spécifique consommé -->
             <td class="text-center">
-                {{ $article->product->date_peremption ? date('d/m/Y', strtotime($article->product->date_peremption)) : '-' }}
+                {{ isset($lotPhysique->date_peremption) ? date('d/m/Y', strtotime($lotPhysique->date_peremption)) : '-' }}
             </td>
 
             <!-- Financement -->

@@ -15,6 +15,7 @@ use App\Http\Controllers\API\OrderController;
 use App\Http\Controllers\API\PasswordController;
 use App\Http\Controllers\API\RolePermissionController;
 use App\Http\Controllers\API\SettingController;
+use App\Http\Controllers\API\StockController;
 use App\Http\Controllers\API\TransporteurController;
 use App\Http\Controllers\API\UserController;
 use Illuminate\Support\Facades\Route;
@@ -129,6 +130,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('{id}/probleme', [LivraisonController::class, 'signalerProbleme']);
     });
 
+    Route::prefix('stocks')->group(function () {
+        // 1. Liste des stocks (lots disponibles) avec filtres & alertes péremptions
+        Route::get('/', [StockController::class, 'index']);
+
+        // 2. Création/Réception d'un nouveau lot (Entrée en stock + écriture historique)
+        Route::post('/', [StockController::class, 'store']);
+
+        Route::post('/sortie', [StockController::class, 'destock']);
+
+        Route::get('/produit/{productId}', [StockController::class, 'productStockStatus']);
+
+        // 5. Historique complet et traçabilité des mouvements d'un lot spécifique
+        Route::get('/lot/{stockId}/mouvements', [StockController::class, 'getLotHistory']);
+    });
     Route::prefix('transporteurs')->group(function () {
         Route::get('/', [TransporteurController::class, 'index']);
         Route::post('/', [TransporteurController::class, 'store']);

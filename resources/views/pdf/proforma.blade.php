@@ -153,56 +153,49 @@
         @php
             $sousTotal = $article->quantite * $article->product->price;
             $total += $sousTotal;
+
+            // Extraction sécurisée du lot physique affecté à cette ligne d'article
+           $lotPhysique = $article->product->lot_prioritaire;
         @endphp
         <tr style="border-bottom: 1px solid #eee;">
-            <!-- Désignation (Aligné à gauche) -->
+            <!-- Désignation -->
             <td style="padding: 10px 8px; text-align: left; vertical-align: middle;">
                 <strong style="color: #2c3e50; display: block; font-size: 13px;">{{ $article->product->intitule }}</strong>
                 <small style="color: #7f8c8d; font-size: 11px;">Ref: {{ $article->product->reference }}</small>
             </td>
 
-            <!-- N° Lot (Centré) -->
-            <td style="padding: 10px 8px; text-align: center; vertical-align: middle; font-size: 12px;">
-                {{ $article->product->lot ?? '-' }}
+            <!-- N° Lot extrait dynamiquement selon la stratégie appliquée (FIFO/LIFO) -->
+            <td style="padding: 10px 8px; text-align: center; vertical-align: middle; font-size: 12px; font-family: monospace;">
+                {{ $lotPhysique->num_lot ?? '-' }}
             </td>
 
-            <!-- Date de Péremption (Centré) -->
+            <!-- Date de Péremption rattachée au lot spécifique extrait -->
             <td style="padding: 10px 8px; text-align: center; vertical-align: middle; font-size: 12px;">
-                {{ $article->product->date_peremption ? date('d/m/Y', strtotime($article->product->date_peremption)) : '-' }}
+                {{ isset($lotPhysique->date_peremption) ? date('d/m/Y', strtotime($lotPhysique->date_peremption)) : '-' }}
             </td>
 
-            <!-- Financement (Centré) -->
+            <!-- Financement -->
             <td style="padding: 10px 8px; text-align: center; vertical-align: middle; font-size: 12px;">
                 {{ $article->product->financement ?? '-' }}
             </td>
 
-            <!-- Quantité (Centré) -->
+            <!-- Quantité -->
             <td style="padding: 10px 8px; text-align: center; vertical-align: middle; font-weight: 600; font-size: 13px;">
                 {{ $article->quantite }}
             </td>
 
-            <!-- Prix Unitaire (Aligné à droite) -->
+            <!-- Prix Unitaire -->
             <td style="padding: 10px 8px; text-align: right; vertical-align: middle; font-size: 12px;">
                 {{ number_format($article->product->price, 0, ',', ' ') }}
             </td>
 
-            <!-- Prix Total (Aligné à droite) -->
+            <!-- Prix Total -->
             <td style="padding: 10px 8px; text-align: right; vertical-align: middle; font-weight: bold; color: #2c3e50; font-size: 13px;">
                 {{ number_format($sousTotal, 0, ',', ' ') }}
             </td>
         </tr>
     @endforeach
     </tbody>
-
-    <!-- Ligne optionnelle pour afficher le Total global en bas de tableau -->
-{{--    <tfoot>
-    <tr style="background-color: #fdfdfd; border-top: 2px solid #bdc3c7;">
-        <td colspan="6" style="padding: 12px 8px; text-align: right; font-weight: bold; text-transform: uppercase; font-size: 12px;">Montant Total Global :</td>
-        <td style="padding: 12px 8px; text-align: right; font-weight: bold; color: #e74c3c; font-size: 14px;">
-            {{ number_format($total, 0, ',', ' ') }}
-        </td>
-    </tr>
-    </tfoot>--}}
 </table>
 
 <div class="total-box">
