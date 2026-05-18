@@ -46,6 +46,7 @@ class JWTAuthController extends Controller
                 'departement_id' => $request->get('departement_id'),
                 'email' => $request->get('email'),
                 'phone' => $request->get('phone'),
+                'code' => $request->get('code'),
                 'password' => Hash::make($request->get('password')),
                 'user_type' => User::CUSTOMER_TYPE
             ]);
