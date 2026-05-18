@@ -11,6 +11,8 @@ use App\Models\Litige;
 use App\Models\Paiement;
 use App\Models\Product;
 use App\Models\ReturnRequest;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -155,20 +157,44 @@ class CustomerController extends Controller
                 'city_id' => $client->city_id,
                 'balance' => $client->balance,
                 'debt' => $client->debt,
+                'code' => $client->code,
             ]
         ]);
     }
-    // Mettre à jour infos client
+    public function getCustomerById($id)
+    {
+        $client = User::with(['image', 'city', 'departement'])->find($id);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'name' => $client->name,
+                'email' => $client->email,
+                'phone' => $client->phone,
+                'departement_id' => $client->departement_id,
+                'city_id' => $client->city_id,
+                'balance' => $client->balance,
+                'debt' => $client->debt,
+                'code' => $client->code,
+            ]
+        ]);
+    }
+
     public function updateInfo(Request $request)
     {
-        $client = Auth::user();
+        /** @var User $client */
+        $client = User::find($request->id);
 
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|min:3',
-            'email' => 'required|email|unique:users,email,' . $client->id,
-            'phone' => 'required|string',
-            'departement_id' => 'required|integer',
-            'city_id' => 'required|integer',
+            'name'           => 'required|string|min:3',
+            'email'          => 'required|email|unique:users,email,' . $client->id,
+            'phone'          => 'required|string',
+            // CORRIGÉ : Utilisation de unique_number pour correspondre au FormBuilder d'Angular
+            'code'  => 'required|string|unique:users,code,' . $client->id,
+            'departement_id' => 'required|integer|exists:departements,id', // 'exists' sécurise la cohérence BD
+            'city_id'        => 'required|integer|exists:cities,id',
+            // AJOUTÉ : Validation optionnelle du mot de passe si fourni par le front
+            'password'       => 'nullable|string|min:8',
         ]);
 
         if ($validator->fails()) {
@@ -178,16 +204,25 @@ class CustomerController extends Controller
             ], 422);
         }
 
-        $client->update($request->only([
+        // 1. Récupérer les données de base validées
+        $data = $request->only([
             'name',
             'email',
             'phone',
+            'code',
             'departement_id',
             'city_id',
-        ]));
+        ]);
 
+        // 2. Traitement du mot de passe uniquement s'il est renseigné
+        if ($request->filled('password')) {
+            $data['password'] = Hash::make($request->password);
+        }
 
-        return Helpers::success($client,'Informations mises à jour avec succès');
+        // 3. Mise à jour de l'instance
+        $client->update($data);
+
+        return Helpers::success($client, 'Informations mises à jour avec succès');
     }
     public function destroyReturn(ReturnRequest $returnRequest)
     {

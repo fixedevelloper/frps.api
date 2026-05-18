@@ -178,6 +178,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('customers')->group(function () {
         Route::get('/', [SettingController::class, 'getCustomers']);
+        Route::get('/{id}', [CustomerController::class, 'getCustomerById']);
         Route::get('info', [CustomerController::class, 'getInfo']);
         Route::post('update', [CustomerController::class, 'updateInfo']);
         Route::get('{id}/advantages', [AdvantageController::class, 'customerAdvantages']);

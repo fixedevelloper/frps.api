@@ -52,6 +52,7 @@ class SettingController extends Controller
                 'name' => $payment->name,
                 'email' => $payment->email,
                 'phone' => $payment->phone,
+                'code' => $payment->code,
                 'date' => $payment->created_at,
                 'image' => $payment->image ? $payment->image->src : null,
                 'departement' => $payment->departement
