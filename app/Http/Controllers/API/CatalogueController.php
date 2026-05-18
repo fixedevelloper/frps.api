@@ -345,7 +345,7 @@ class CatalogueController extends Controller
             'intitule' => 'required|string',
             'category_id' => 'required|exists:categories,id',
             'reference' => 'required|string|unique:products,reference,' . $id,
-            'type_stock' => 'required|in:Lot,FIFO,LIFO',
+            'type_stock' => 'required|in:FIFO,LIFO',
             'price' => 'required|numeric',
             'price_buy' => 'required|numeric',
             'lot' => 'nullable|string',
