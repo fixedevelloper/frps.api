@@ -28,6 +28,7 @@ class JWTAuthController extends Controller
             'name' => 'required|string|max:255',
             'city_id' => 'required|integer|max:255',
             'phone' => 'required|string|max:9',
+            'code' => 'required|string',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:6|confirmed',
         ]);
