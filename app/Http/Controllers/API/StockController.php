@@ -11,6 +11,7 @@ use App\Models\StockMovement;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Exception;
@@ -283,5 +284,44 @@ class StockController extends Controller
             'lot_details' => $stock,
             'historique_mouvements' => $movements
         ]);
+    }
+    public function ajusterLot(Request $request)
+    {
+        $request->validate([
+            'stock_id' => 'required|exists:stocks,id',
+            'quantite_actuelle' => 'required|integer|min:0',
+            'motif' => 'required|string',
+            'emplacement' => 'nullable|string'
+        ]);
+
+        DB::transaction(function () use ($request) {
+            $lot = Stock::findOrFail($request->stock_id);
+
+            // 1. Calculer la différence pour générer le mouvement de stock exact
+            $ancienneQuantite = $lot->quantite_actuelle;
+            $nouvelleQuantite = $request->quantite_actuelle;
+            $difference = $nouvelleQuantite - $ancienneQuantite;
+
+            // 2. Mettre à jour le lot physique
+            $lot->quantite_actuelle = $nouvelleQuantite;
+            if ($request->has('emplacement')) {
+                $lot->emplacement = $request->emplacement;
+            }
+            $lot->save();
+
+            // 3. Enregistrer le mouvement d'ajustement (Positif ou Négatif)
+            if ($difference !== 0) {
+                StockMovement::create([
+                    'product_id' => $lot->product_id,
+                    'stock_id' => $lot->id,
+                    'type' => 'Ajustement Inventaire',
+                    'quantite' => abs($difference), // Toujours positif dans le champ quantité
+                    'motif' => $request->motif . " (Ancien: {$ancienneQuantite} -> Nouveau: {$nouvelleQuantite})",
+                    'user_id' => Auth::id()
+                ]);
+            }
+        });
+
+        return response()->json(['message' => 'Success']);
     }
 }

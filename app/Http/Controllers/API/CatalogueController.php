@@ -7,6 +7,7 @@ namespace App\Http\Controllers\API;
 use App\Helpers\api\Helpers;
 use App\Helpers\Helper;
 use App\Http\Controllers\Controller;
+use App\Http\Exports\ProductCsvExporter;
 use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\EnterStock;
@@ -17,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CatalogueController extends Controller
 {
@@ -236,7 +238,11 @@ class CatalogueController extends Controller
             ]
         ]);
     }
-
+    public function productExport(ProductCsvExporter $exporter)
+    {
+        // On délègue le travail à notre classe isolée dans le dossier Exports
+        return $exporter->download();
+    }
     public function productsWaiting(Request $request)
     {
         $perPage = $request->input('per_page', 5); // nombre d'éléments par page

@@ -77,6 +77,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('publish/{id}', [CatalogueController::class, 'publishProduct']);
         Route::get('{id}', [CatalogueController::class, 'getProductByID']);
         Route::put('{id}', [CatalogueController::class, 'updateProduct']);
+        Route::get('export/current', [CatalogueController::class, 'productExport']);
     });
 
     Route::prefix('categories')->group(function () {
@@ -138,6 +139,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [StockController::class, 'store']);
 
         Route::post('/sortie', [StockController::class, 'destock']);
+        Route::post('/update-lot', [StockController::class, 'ajusterLot']);
 
         Route::get('/produit/{productId}', [StockController::class, 'productStockStatus']);
 

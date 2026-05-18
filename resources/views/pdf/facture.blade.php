@@ -146,7 +146,7 @@
     </tr>
 </table>
 
-<div class="invoice-title">Facture #{{ $commande->reference }}</div>
+<div class="invoice-title">BL/Facture #{{ $commande->reference }}</div>
 
 <!-- Section de facturation & métadonnées -->
 <table class="info-section">
