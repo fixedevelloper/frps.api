@@ -163,7 +163,7 @@
             <div class="info-label">Détails du document :</div>
             <strong>Date d'émission :</strong> {{ now()->format('d/m/Y') }}<br>
             <strong>Statut :</strong> {{ $commande->string_status->value ?? 'N/A' }}<br>
-            <strong>Mode de règlement :</strong> Par virement / Espèces
+
         </td>
     </tr>
 </table>
