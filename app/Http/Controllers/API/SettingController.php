@@ -147,9 +147,10 @@ class SettingController extends Controller
         $validated = $request->validate([
             'name'  => 'required|string',
             'phone' => 'required|string',
+            'address' => 'nullable|string',
             // On ignore l'ID actuel pour la validation unique de l'email
             'email' => 'required|email|unique:users,email,' . $id,
-            'type'  => 'required|exists:roles,name',
+            'role'  => 'required|exists:roles,name',
             'image' => 'nullable|image|max:2048'
         ]);
 
@@ -158,12 +159,13 @@ class SettingController extends Controller
             'name'  => $validated['name'],
             'phone' => $validated['phone'],
             'email' => $validated['email'],
+            'address' => $validated['address'],
             // On s'assure que le user_type reste cohérent
-            'user_type' => ($validated['type'] === 'chauffeur') ? User::DRIVER_TYPE : User::AGENT_TYPE,
+           // 'user_type' => ($validated['type'] === 'chauffeur') ? User::DRIVER_TYPE : User::AGENT_TYPE,
         ]);
 
         // 2. Mise à jour du rôle Spatie (syncRoles remplace l'ancien rôle par le nouveau)
-        $user->syncRoles([$validated['type']]);
+        $user->syncRoles([$validated['role']]);
 
         // 3. Gestion de l'image
         if ($request->hasFile('image')) {

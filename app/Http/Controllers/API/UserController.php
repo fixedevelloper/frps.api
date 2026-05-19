@@ -45,9 +45,10 @@ class UserController extends Controller
         // 1. Validation
         $request->validate([
             'name'           => 'required|string|max:255',
-            'user_type'      => 'required|integer|in:0,1,2,3',
+            'user_type'      => 'nullable|integer|in:0,1,2,3',
             'phone'          => 'required|string|unique:users,phone,' . ($id ?? 'NULL'),
             'email'          => 'nullable|email|unique:users,email,' . ($id ?? 'NULL'),
+            'role'  => 'required|exists:roles,name',
             'address'        => 'nullable|string',
             'city_id'        => 'nullable|exists:cities,id',
             'departement_id' => 'nullable|exists:departements,id',
@@ -97,7 +98,7 @@ class UserController extends Controller
                 $user->activated = true;
                 $user->pending_balance = 0.0;
             }
-
+            $user->syncRoles([$request->role]);
             $user->save();
 
             DB::commit();
@@ -110,19 +111,28 @@ class UserController extends Controller
         }
     }
 
-    /**
-     * Détails d'un utilisateur
-     */
+
     public function show($id)
     {
-        $user = User::with(['image', 'city', 'departement'])->find($id);
+        $user = User::with([
+            'image',
+            'city',
+            'departement',
+            'roles',
+        ])->find($id);
 
         if (!$user) {
             return Helpers::error("Utilisateur introuvable", 404);
         }
 
-        return Helpers::success($user);
-    }
+        // récupérer le premier rôle
+        $user->role = $user->roles->first()?->name;
+
+    // optionnel : masquer la collection complète des rôles
+    unset($user->roles);
+
+    return Helpers::success($user);
+}
 
     /**
      * Suppression
