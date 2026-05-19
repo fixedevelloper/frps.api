@@ -182,6 +182,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('info', [CustomerController::class, 'getInfo']);
         Route::post('update', [CustomerController::class, 'updateInfo']);
         Route::get('{id}/advantages', [AdvantageController::class, 'customerAdvantages']);
+        Route::delete('/{id}', [UserController::class, 'destroy']);
     });
 
     // --- AVANTAGES (CRUD & Toggle) ---
