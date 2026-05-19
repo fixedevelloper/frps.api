@@ -52,15 +52,10 @@ class SettingController extends Controller
                 'name' => $payment->name,
                 'email' => $payment->email,
                 'phone' => $payment->phone,
+                'type' => $payment->type,
                 'code' => $payment->code,
                 'date' => $payment->created_at,
                 'image' => $payment->image ? $payment->image->src : null,
-                'departement' => $payment->departement
-                    ? $payment->departement->name
-                    : null,
-                'city' => $payment->city
-                    ? $payment->city->name
-                    : null,
             ];
         });
 

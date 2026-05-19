@@ -26,7 +26,7 @@ class JWTAuthController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'city_id' => 'required|integer|max:255',
+           // 'city_id' => 'required|integer|max:255',
             'phone' => 'required|string|max:9',
             'code' => 'required|string',
             'email' => 'required|string|email|max:255|unique:users',
@@ -43,8 +43,8 @@ class JWTAuthController extends Controller
 
             $user = User::create([
                 'name' => $request->get('name'),
-                'city_id' => $request->get('city_id'),
-                'departement_id' => $request->get('departement_id'),
+                'type' => $request->get('type'),
+               // 'departement_id' => $request->get('departement_id'),
                 'email' => $request->get('email'),
                 'phone' => $request->get('phone'),
                 'code' => $request->get('code'),

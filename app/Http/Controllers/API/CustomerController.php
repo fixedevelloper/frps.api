@@ -171,8 +171,7 @@ class CustomerController extends Controller
                 'name' => $client->name,
                 'email' => $client->email,
                 'phone' => $client->phone,
-                'departement_id' => $client->departement_id,
-                'city_id' => $client->city_id,
+                'type' => $client->type,
                 'balance' => $client->balance,
                 'debt' => $client->debt,
                 'code' => $client->code,
@@ -189,12 +188,8 @@ class CustomerController extends Controller
             'name'           => 'required|string|min:3',
             'email'          => 'required|email|unique:users,email,' . $client->id,
             'phone'          => 'required|string',
-            // CORRIGÉ : Utilisation de unique_number pour correspondre au FormBuilder d'Angular
+            'type'          => 'required|string',
             'code'  => 'required|string|unique:users,code,' . $client->id,
-            'departement_id' => 'required|integer|exists:departements,id', // 'exists' sécurise la cohérence BD
-            'city_id'        => 'required|integer|exists:cities,id',
-            // AJOUTÉ : Validation optionnelle du mot de passe si fourni par le front
-            'password'       => 'nullable|string|min:8',
         ]);
 
         if ($validator->fails()) {
@@ -210,8 +205,7 @@ class CustomerController extends Controller
             'email',
             'phone',
             'code',
-            'departement_id',
-            'city_id',
+            'type',
         ]);
 
         // 2. Traitement du mot de passe uniquement s'il est renseigné
