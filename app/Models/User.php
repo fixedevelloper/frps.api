@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Mail\ResetPasswordMail;
 use App\Notifications\VerifyEmailNotification;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,7 +20,7 @@ class User extends Authenticatable implements MustVerifyEmail
     const AGENT_TYPE = 3;
     const DRIVER_TYPE = 1;
     const CUSTOMER_TYPE = 2;
-
+    use SoftDeletes;
     protected $dates = ['email_verified_at'];
 
     protected $fillable = [

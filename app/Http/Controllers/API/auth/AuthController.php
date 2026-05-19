@@ -15,7 +15,7 @@ class AuthController extends Controller
     // Login client (CUSTOMER)
     public function login(Request $request)
     {
-        $credentials = $request->only('phone', 'password');
+        $credentials = $request->only('code', 'password');
 
         if (!Auth::attempt($credentials)) {
             return Helpers::unauthorized(['message' => 'Identifiants invalides'], 401);
