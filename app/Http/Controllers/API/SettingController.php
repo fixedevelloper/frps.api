@@ -18,6 +18,7 @@ use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use function Illuminate\Support\query;
 
 class SettingController extends Controller
 {
@@ -31,8 +32,37 @@ class SettingController extends Controller
     }
     public function notifications(Request $request)
     {
-        $departements = Notification::all();
-        return Helpers::success($departements);
+        $notifications = Notification::whereNull('read_at')
+            ->latest() // Pour avoir les plus récentes en premier
+            ->get();
+
+        return Helpers::success($notifications);
+    }
+    public function markAsRead($id, Request $request)
+    {
+        // On cherche la notification PARMI celles de l'utilisateur connecté
+        $notification = $request->user()->unreadNotifications()->find($id);
+
+        if (!$notification) {
+            return Helpers::error('Notification non trouvée ou déjà lue', 404);
+        }
+
+        // Marque comme lue
+        $notification->markAsRead();
+
+        return Helpers::success(['message' => 'Notification marquée comme lue']);
+    }
+    public function markAllAsRead(Request $request)
+    {
+        // Marque toutes les notifications non lues du système comme lues
+        $count = Notification::query()
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        return Helpers::success([
+            'message' => 'Toutes les notifications ont été marquées comme lues',
+            'updated_count' => $count // Utile pour savoir combien ont été modifiées
+        ]);
     }
     public function cities(Request $request,$departement_id)
     {

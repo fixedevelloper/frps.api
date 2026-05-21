@@ -218,6 +218,7 @@ return new class extends Migration
             $table->timestamps();
         });
         Schema::create('notifications', function (Blueprint $table) {
+
             $table->id();
             $table->string('type',244)->nullable();
             $table->text('description')->nullable();

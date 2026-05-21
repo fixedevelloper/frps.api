@@ -2,12 +2,13 @@
 
 namespace App\Notifications;
 
-use App\Models\Commande;
+use Illuminate\Broadcasting\Channel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Notifications\Messages\BroadcastMessage; // <--- Importez ceci
 use Illuminate\Notifications\Notification;
-
+use App\Models\Commande;
 
 class NewOrderNotification extends Notification implements ShouldQueue
 {
@@ -25,9 +26,17 @@ class NewOrderNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        // Ajoutez 'broadcast' ici pour activer Pusher
+        return ['mail', 'database', 'broadcast'];
     }
+    public function broadcastOn(): Channel
+    {
+        // Pour notifier tout le monde
+        return new Channel('global-notifications');
 
+        // OU si vous voulez cibler un canal privé spécifique
+        // return new PrivateChannel('App.Models.User.' . $this->userId);
+    }
     /**
      * Get the mail representation of the notification.
      */
@@ -39,6 +48,18 @@ class NewOrderNotification extends Notification implements ShouldQueue
                 'admin_name' => 'Administrateur',
                 'commande' => $this->commande,
             ]);
+    }
+
+    /**
+     * Get the broadcastable representation of the notification.
+     */
+    public function toBroadcast(object $notifiable): BroadcastMessage
+    {
+        return new BroadcastMessage([
+            'commande_id' => $this->commande->id,
+            'total' => $this->commande->total,
+            'message' => "Nouvelle commande n°{$this->commande->id} reçue !",
+        ]);
     }
 
     /**

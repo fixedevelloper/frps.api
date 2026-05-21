@@ -145,7 +145,7 @@ class OrderController extends Controller
                 'status' => $commande->stringStatus->value,
                 'validatedStatus' => $commande->stringValidatedStatus->value,
                 'date' => $commande->created_at,
-               'customer_image' => $commande->customer->image ?->src,
+              // 'customer_image' => $commande->customer->image ?->src,
                 'customer_name' => $commande->customer ? $commande->customer->name : null,
                 'items' => $commande->products->map(fn($item) => [
                     'id' => $item->id,
@@ -857,7 +857,7 @@ class OrderController extends Controller
                 'montant'         => $montantFinal,
                 'methode'         => $request->methodPayment,
                 'status'          => 'pending', // Reste en pending jusqu'au webhook Tranzak
-                'etat'            => Helpers::PAIEMENTETATCOMPLET, // Attention au nom de votre classe (Helpers vs Helper)
+                'etat'            => Helper::PAIEMENTETATCOMPLET, // Attention au nom de votre classe (Helpers vs Helper)
                 'date_paiement'   => now(),
                 'advantage_id'    => $advantage?->id,
             'discount_amount' => $discount
@@ -868,7 +868,7 @@ class OrderController extends Controller
         $nouveauReste = max($commande->rest_to_pay - $montantFinal - $discount, 0);
 
         $commande->update([
-            'status'          => Helpers::STATUSPROCESSING,
+            'status'          => Helper::STATUSPROCESSING,
             'rest_to_pay'     => $nouveauReste,
             'discount_amount' => $commande->discount_amount + $discount
         ]);
@@ -886,7 +886,7 @@ class OrderController extends Controller
         if (round($commande->total, 2) === $totalCalcule) {
             $this->generateBordereau($commande);
         }
-
+        broadcast(new NewOrderNotification($commande));
         DB::commit();
 
         return Helpers::success([

@@ -59,4 +59,11 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         $this->notify(new VerifyEmailNotification);
     }
+    // Ajoutez cette méthode pour récupérer toutes les notifications de l'utilisateur
+    public function notifications()
+    {
+        // C'est une relation polymorphique native de Laravel
+        return $this->morphMany(\Illuminate\Notifications\DatabaseNotification::class, 'notifiable')
+            ->latest();
+    }
 }

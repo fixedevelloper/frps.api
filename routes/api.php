@@ -18,6 +18,7 @@ use App\Http\Controllers\API\SettingController;
 use App\Http\Controllers\API\StockController;
 use App\Http\Controllers\API\TransporteurController;
 use App\Http\Controllers\API\UserController;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Route;
 
 
@@ -55,6 +56,11 @@ Route::get('/user-permissions', function() {
 
 Route::middleware('auth:sanctum')->group(function () {
 
+// Marquer une notification spécifique comme lue
+    Route::post('/notifications/{id}/read', [SettingController::class, 'markAsRead']);
+
+    // Marquer tout comme lu
+    Route::post('/notifications/mark-all-read', [SettingController::class, 'markAllAsRead']);
     // --- AUTH & PROFILE ---
     Route::get('profile', [ProfilController::class, 'profile']);
     Route::post('change_password', [ProfilController::class, 'changePassword']);
