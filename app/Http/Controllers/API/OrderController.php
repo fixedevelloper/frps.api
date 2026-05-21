@@ -279,6 +279,9 @@ class OrderController extends Controller
             'customer_name' => $commande->customer
                 ? $commande->customer->name
                 : null,
+            'customer_code' => $commande->customer
+                ? $commande->customer->code
+                : null,
 
             // Produits commandés
             'items' => $commande->products->map(function ($item) {
@@ -769,135 +772,123 @@ class OrderController extends Controller
 
     public function paiementFactureMobile(Request $request)
     {
-        // 1. Validation des entrées (En dehors de la transaction)
+        // 1. Validation des entrées
         $request->validate([
-            'order_id'      => ['required', 'exists:commandes,id'],
-            'amount'        => ['required', 'numeric', 'min:0'],
-            'methodPayment' => ['required'],
-            'advantage_id'  => ['nullable', 'exists:advantages,id']
+            'order_id'       => ['required', 'exists:commandes,id'],
+            'amount'         => ['required', 'numeric', 'min:0'],
+            'methodPayment'  => ['required'], // 2 = MTN, 3 = Orange, 4 = Cash
+            'is_partial'     => ['required', 'boolean'],
+            'deadline_weeks' => ['nullable', 'required_if:is_partial,true', 'integer', 'between:1,4']
         ]);
 
         $commande = Commande::findOrFail($request->order_id);
+        $montantRestant = (float) $commande->rest_to_pay;
 
-        // Cas spécifique (par exemple: Cash/Test) - Pas besoin de transaction ici
-        if ($request->methodPayment == 4) {
-            return Helpers::success([
-                'url'       => '',
-                'mode'      => $request->methodPayment,
-                'amount'    => $commande->total,
-                'discount'  => 0.0,
-                'remaining' => 0.0
-            ]);
+        if ($montantRestant <= 0) {
+            return Helpers::error("Cette commande est déjà entièrement réglée.");
         }
 
-        // 2. Vérification d'avantage existant
-        if ($request->filled('advantage_id')) {
-            $hasAdvantage = DB::table('commande_advantages')
-                ->where('commande_id', $commande->id)
-                ->exists();
+        // 2. Vérification de l'historique des paiements partiels
+        // On regarde si un paiement (Partiel ou Complet) validé ou en cours existe déjà
+        $hasExistingPayment = DB::table('paiements')
+            ->where('commande_id', $commande->id)
+            ->whereIn('status', ['paid', 'pending', 'processing'])
+            ->exists();
 
-            if ($hasAdvantage) {
-                return Helpers::error("Cette commande bénéficie déjà d'un avantage. Les remises ne sont pas cumulables.");
-            }
+        // Si la commande a déjà subi un historique de paiement, on refuse un NOUVEAU paiement partiel (il faut solder)
+        if ($request->is_partial && $hasExistingPayment) {
+            return Helpers::error("Un paiement a déjà été initié sur cette commande. Vous devez régler le solde restant en totalité.");
         }
 
-        // 3. Initialisation des variables de calcul
-        $montantInitial = (float) $commande->rest_to_pay;
-        $discount       = 0.0;
-        $montantFinal   = $montantInitial;
-        $advantage      = null;
-
-        // 4. Logique de calcul de l'avantage
-        if ($request->filled('advantage_id')) {
-            $advantage = Advantage::findOrFail($request->advantage_id);
-
-            if (!$advantage->active) {
-                return Helpers::error("Cet avantage est actuellement désactivé.");
-            }
-
-            switch ($advantage->type) {
-                case 'remise':
-                    $discount = $advantage->is_percentage
-                        ? ($montantInitial * $advantage->value) / 100
-                        : (float) $advantage->value;
-                    $montantFinal = $montantInitial - $discount;
-                    break;
-
-                case 'bon_reduction':
-                    $discount = (float) $advantage->value;
-                    $montantFinal = $montantInitial - $discount;
-                    break;
-
-                case 'paiement_differe':
-                    $montantFinal = ($montantInitial * $advantage->percentage_paid) / 100;
-                    // Note : Le discount reste 0 car la somme restante sera payée plus tard
-                    break;
-            }
+        // 3. Calcul du montant attendu
+        if ($request->is_partial) {
+            // Mode partiel : Forcer 70% du reste à payer (arrondi à l'entier pour le FCFA)
+            $montantAttendu = round($montantRestant * 0.7);
+        } else {
+            // Mode total : Le reste à payer complet
+            $montantAttendu = $montantRestant;
         }
 
-        // Sécurité : Le montant final ne peut pas être négatif
-        $montantFinal = max($montantFinal, 0);
-
-        // 5. Vérification de l'intégrité du montant
-        if (round((float)$request->amount, 2) !== round($montantFinal, 2)) {
-            return Helpers::error("Le montant envoyé ({$request->amount}) ne correspond pas au calcul attendu ({$montantFinal}).");
+        // 4. Vérification de l'intégrité du montant envoyé
+        if (round((float)$request->amount) !== round($montantAttendu)) {
+            return Helpers::error("Le montant envoyé ({$request->amount}) ne correspond pas au calcul attendu ({$montantAttendu}).");
         }
 
-        // 6. Initialisation du paiement Tranzak
+        // 5. Génération de la référence et du lien de paiement
         $reference = 'FRPS-' . Str::upper(Str::random(10));
         $url = URL::route('payment.pay', ['reference' => $reference]);
 
-        // 7. Début de la transaction UNIQUEMENT pour les écritures en BDD
+        // 6. Début de la transaction
         DB::beginTransaction();
 
         try {
+            $estCash = ($request->methodPayment == 4);
+
+            // Configuration des statuts selon la méthode de paiement
+            $statutInitial = $estCash ? 'processing' : 'pending';
+
+            // Mapping de l'état selon votre enum [PAIEMENTETATCOMPLET, PAIEMENTETATPARTIEL]
+            $etatPaiement = $request->is_partial
+                ? Helper::PAIEMENTETATPARTIEL
+                : Helper::PAIEMENTETATCOMPLET;
+
+            // Sauvegarde des métadonnées du délai (deadline) dans `provider_response` pour éviter de modifier votre table
+            $providerResponse = null;
+            if ($request->is_partial) {
+                $providerResponse = json_encode([
+                    'deadline_weeks' => $request->deadline_weeks,
+                    'deadline_date'  => now()->addWeeks((int)$request->deadline_weeks)->toDateTimeString()
+                ]);
+            }
+
+            // Création de l'enregistrement de paiement
             $paiement = Paiement::create([
-                'reference'       => $reference,
-                'commande_id'     => $commande->id,
-                'montant'         => $montantFinal,
-                'methode'         => $request->methodPayment,
-                'status'          => 'pending', // Reste en pending jusqu'au webhook Tranzak
-                'etat'            => Helper::PAIEMENTETATCOMPLET, // Attention au nom de votre classe (Helpers vs Helper)
-                'date_paiement'   => now(),
-                'advantage_id'    => $advantage?->id,
-            'discount_amount' => $discount
-        ]);
-
-        // ATTENTION : Mettre à jour le reste à payer alors que le statut est "pending"
-        // peut être risqué si l'utilisateur annule le paiement sur la page Tranzak.
-        $nouveauReste = max($commande->rest_to_pay - $montantFinal - $discount, 0);
-
-        $commande->update([
-            'status'          => Helper::STATUSPROCESSING,
-            'rest_to_pay'     => $nouveauReste,
-            'discount_amount' => $commande->discount_amount + $discount
-        ]);
-
-        // Historique de l'avantage (Table Pivot)
-        if ($advantage) {
-            $commande->advantages()->attach($advantage->id, [
-                'amount'     => $discount,
-                'created_at' => now()
+                'commande_id'       => $commande->id,
+                'montant'           => $montantAttendu,
+                'methode'           => $request->methodPayment,
+                'reference'         => $reference,
+                'status'            => $statutInitial,
+                'etat'              => $etatPaiement,
+                'date_paiement'     => now(),
+                'provider_response' => $providerResponse
             ]);
-        }
 
-        // 8. Bordereau (si premier paiement) - Correction de la comparaison des floats
-        $totalCalcule = round($commande->rest_to_pay + $montantFinal + $discount, 2);
-        if (round($commande->total, 2) === $totalCalcule) {
-            $this->generateBordereau($commande);
-        }
-        broadcast(new NewOrderNotification($commande));
-        DB::commit();
+            // 7. Mise à jour de la commande en temps réel si paiement par Cash
+            $nouveauReste = $montantRestant;
 
-        return Helpers::success([
-            'mode'      => $request->methodPayment,
-            'url'       => $url,
-            'amount'    => $montantFinal,
-            'discount'  => $discount,
-            'remaining' => $nouveauReste
-        ]);
+            if ($estCash) {
+                // On soustrait uniquement le montant perçu en Cash (qu'il soit de 70% ou de 100%)
+                $nouveauReste = max($montantRestant - $montantAttendu, 0);
 
-    } catch (\Exception $e) {
+                $commande->update([
+                    'status'      => $nouveauReste === 0.0 ? Helper::STATUSSUCCESS : Helper::STATUSPROCESSING,
+                    'rest_to_pay' => $nouveauReste,
+                ]);
+
+                // Génération du bordereau si la commande est définitivement soldée
+                if ($nouveauReste === 0.0) {
+                    $this->generateBordereau($commande);
+                }
+            } else {
+                // Pour MoMo/Orange Money (pending), on passe la commande en traitement sans toucher au reste à payer immédiatement
+                $commande->update([
+                    'status' => Helper::STATUSPROCESSING
+                ]);
+            }
+
+            broadcast(new NewOrderNotification($commande));
+            DB::commit();
+
+            // 8. Retour de la réponse
+            return Helpers::success([
+                'url'       => $estCash ? '' : $url,
+                'mode'      => $request->methodPayment,
+                'amount'    => $montantAttendu,
+                'discount'  => 0.0,
+                'remaining' => $nouveauReste // En Cash le reste baisse, en Mobile il baissera via le webhook
+            ]);
+
+        } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Erreur Paiement Code: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return Helpers::error("Erreur système lors de l'enregistrement du paiement.");
