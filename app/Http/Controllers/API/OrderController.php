@@ -223,8 +223,8 @@ class OrderController extends Controller
 
             if (!is_null($setting)) {
                 // 📧 Mail en queue
-                Notification::route('mail', $setting->notification_address)
-                    ->notify(new NewOrderNotification($commande));
+            /*    Notification::route('mail', $setting->notification_address)
+                    ->notify(new NewOrderNotification($commande));*/
 
                 // 📲 SMS à l’admin en queue
                 /*                $admin = User::query()->firstWhere('phone', $setting->notification_phone);
