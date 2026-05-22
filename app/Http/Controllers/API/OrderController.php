@@ -12,7 +12,6 @@ use App\Models\Category;
 use App\Models\Commande;
 use App\Models\EnterStock;
 use App\Models\Litige;
-use App\Models\Livraison;
 use App\Models\Paiement;
 use App\Models\Product;
 use App\Models\ProductCommande;
@@ -78,7 +77,7 @@ class OrderController extends Controller
                 'rest_to_pay' => $commande->rest_to_pay,
                 'status' => $commande->stringStatus->value,
                 'validatedStatus' => $commande->stringValidatedStatus->value,
-                'date' => $commande->created_at,
+                'date' => $commande->created_at ? $commande->created_at->format('d/m/Y H:i') : null,
                 'customer_image' => $commande->customer->image ?->src,
                 'customer_name' => $commande->customer ?->name,
 
@@ -272,7 +271,7 @@ class OrderController extends Controller
             'rest_to_pay' => $commande->rest_to_pay,
             'status' => $commande->stringStatus->value,
             'statusValue' => $commande->status,
-            'date' => $commande->created_at,
+            'date' => $commande->created_at ? $commande->created_at->format('d/m/Y H:i') : null,
             'customer_image' => $commande->customer->image,
             'facture_pdf'  => $commande->facture_url,
             'proforma_pdf' => $commande->proforma_url,
