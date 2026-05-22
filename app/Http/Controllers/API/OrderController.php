@@ -1168,28 +1168,82 @@ class OrderController extends Controller
             'action' => 'required|in:confirm,reject'
         ]);
 
-        $payment = Paiement::findOrFail($id);
+        // 1. Charger le paiement avec sa commande pour optimiser les requêtes SQL (Eager Loading)
+        $payment = Paiement::with('commande')->findOrFail($id);
 
-        // Sécurité : Éviter de modifier un paiement déjà validé
+        // 2. Sécurité : Éviter de traiter un paiement qui n'est plus en attente
         if ($payment->status === 'paid') {
-            return response()->json(['status' => 'error', 'message' => 'Cette transaction est déjà validée.'], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Cette transaction est déjà validée.'
+            ], 422);
         }
 
-        if ($request->action === 'confirm') {
-            $payment->update(['status' => 'paid']);
-
-            // Optionnel : Mettre à jour le statut global de la commande ou ajuster la caisse/le stock ici
-
-            $message = "Transaction validée et confirmée.";
-        } else {
-            $payment->update(['status' => 'failed']); // ou 'failed'
-            $message = "Transaction rejetée.";
+        if ($payment->status === 'failed') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Cette transaction a déjà été rejetée.'
+            ], 422);
         }
 
-        return response()->json([
-            'status' => 'success',
-            'message' => $message,
-            'payment' => $payment
-        ]);
+        $commande = $payment->commande;
+
+        // Sécurité au cas où la relation avec la commande est manquante
+        if (!$commande) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Commande associée introuvable.'
+            ], 404);
+        }
+
+        // 3. Utilisation d'une transaction DB pour sécuriser l'écriture simultanée
+        DB::beginTransaction();
+
+        try {
+            if ($request->action === 'confirm') {
+                // Mettre à jour le statut du paiement
+                $payment->update(['status' => 'paid']);
+
+                // CORRECTION: Récupération des vraies valeurs numériques
+                $montantRestant = (float) $commande->rest_to_pay;
+                $montantAttendu = (float) $payment->montant; // On suppose que le montant est stocké dans 'amount'
+
+                // Calcul du nouveau reste à payer
+                $nouveauReste = max($montantRestant - $montantAttendu, 0);
+
+                // Détermination du statut de la commande
+                $nouveauStatutCommande = ($nouveauReste <= 0) ? Helper::STATUSSUCCESS : Helper::STATUSPROCESSING;
+
+                $commande->update([
+                    'status'      => $nouveauStatutCommande,
+                    'rest_to_pay' => $nouveauReste,
+                ]);
+
+                $message = "Transaction validée et confirmée.";
+            } else {
+                // Cas de rejet
+                $payment->update(['status' => 'failed']);
+                $message = "Transaction rejetée.";
+            }
+
+            // Si tout s'est bien passé, on valide définitivement en Base de données
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $message,
+                'payment' => $payment->load('commande') // Optionnel: recharge les données fraîches
+            ]);
+
+        } catch (\Exception $e) {
+            // En cas de bug (ex: perte de connexion, erreur contrainte SQL), on annule tout
+            DB::rollBack();
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Une erreur interne est survenue lors du traitement.',
+                'debug' => config('app.debug') ? $e->getMessage() : null // Affiche l'erreur uniquement en mode local
+            ], 500);
+        }
     }
 }
