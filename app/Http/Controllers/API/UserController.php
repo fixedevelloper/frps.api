@@ -8,18 +8,22 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Image;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
     /**
      * Liste des utilisateurs avec pagination et recherche
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function index(Request $request)
     {
-        $query = User::with(['image', 'city', 'departement']);
+        $query = User::with(['image', 'city', 'departement','roles']);
 
         if ($request->has('type')) {
             $query->where('user_type', $request->type);
@@ -148,5 +152,84 @@ class UserController extends Controller
 
         $user->delete();
         return Helpers::success(null, "Utilisateur supprimé définitivement");
+    }
+    // Réinitialiser le mot de passe
+    public function resetToDefault(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'user_id' => 'required|exists:users,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $user = User::findOrFail($request->user_id);
+
+        // Définition du mot de passe par défaut
+        $defaultPassword = 'Password123';
+
+        $user->update([
+            'password' => Hash::make($defaultPassword),
+            // Optionnel : on peut forcer l'utilisateur à changer de mot de passe au prochain login
+            'must_change_password' => true,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Le mot de passe de {$user->name} a été réinitialisé à : {$defaultPassword}"
+        ], 200);
+    }
+    public function updatePassword(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // 1. Validation stricte des données entrantes
+        $request->validate([
+            'currentPassword' => ['required', 'string'],
+            'newPassword' => [
+                'required',
+                'string',
+                'min:6', // Aligné avec votre validation Angular (minLength: 6)
+                'confirmed' // S'assure que 'newPassword_confirmation' est présent et identique
+            ],
+        ], [
+            'currentPassword.required' => 'Le mot de passe actuel est obligatoire.',
+            'newPassword.required' => 'Le nouveau mot de passe est obligatoire.',
+            'newPassword.min' => 'Le nouveau mot de passe doit contenir au moins 6 caractères.',
+            'newPassword.confirmed' => 'Les deux mots de passe ne correspondent pas.',
+        ]);
+
+        // 2. Vérification que le mot de passe actuel est correct
+        if (!Hash::check($request->currentPassword, $user->password)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Le mot de passe actuel est incorrect.'
+            ], 422); // Code 422: Unprocessable Entity
+        }
+
+        // 3. Mise à jour sécurisée en base de données
+        $user->update([
+            'password' => Hash::make($request->newPassword)
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Mot de passe mis à jour avec succès.'
+        ]);
+    }
+    public function updateInfo(Request $request)
+    {
+        $user = Auth::user(); // ou $request->user();
+
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'Non authentifié.'], 401);
+        }
+
+        // Ici, vous pouvez utiliser $user->id en toute sécurité
+        $user->update($request->only(['name', 'email', 'phone']));
+
+        return response()->json(['status' => 'success', 'message' => 'Profil mis à jour']);
     }
 }

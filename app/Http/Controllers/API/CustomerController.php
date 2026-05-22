@@ -145,20 +145,27 @@ class CustomerController extends Controller
     // Récupérer infos du client connecté
     public function getInfo()
     {
+        /** @var \App\Models\User $client */
         $client = Auth::user();
+        logger($client);
+        // Optionnel : Si vous voulez être sûr à 100% qu'un utilisateur est connecté
+        if (!$client) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
+        }
+
 
         return response()->json([
             'status' => 'success',
-            'data' => [
-                'name' => $client->name,
-                'email' => $client->email,
-                'phone' => $client->phone,
-                'departement_id' => $client->departement_id,
-                'city_id' => $client->city_id,
-                'balance' => $client->balance,
-                'debt' => $client->debt,
-                'code' => $client->code,
-            ]
+            'data' => $client->only([
+                'name',
+                'email',
+                'phone',
+                'departement_id',
+                'city_id',
+                'balance',
+                'debt',
+                'code'
+            ])
         ]);
     }
     public function getCustomerById($id)

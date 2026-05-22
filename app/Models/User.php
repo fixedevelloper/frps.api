@@ -9,7 +9,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Request;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -65,5 +68,44 @@ class User extends Authenticatable implements MustVerifyEmail
         // C'est une relation polymorphique native de Laravel
         return $this->morphMany(\Illuminate\Notifications\DatabaseNotification::class, 'notifiable')
             ->latest();
+    }
+    public function updatePassword(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // 1. Validation stricte des données entrantes
+        $request->validate([
+            'currentPassword' => ['required', 'string'],
+            'newPassword' => [
+                'required',
+                'string',
+                'min:6', // Aligné avec votre validation Angular (minLength: 6)
+                'confirmed' // S'assure que 'newPassword_confirmation' est présent et identique
+            ],
+        ], [
+            'currentPassword.required' => 'Le mot de passe actuel est obligatoire.',
+            'newPassword.required' => 'Le nouveau mot de passe est obligatoire.',
+            'newPassword.min' => 'Le nouveau mot de passe doit contenir au moins 6 caractères.',
+            'newPassword.confirmed' => 'Les deux mots de passe ne correspondent pas.',
+        ]);
+
+        // 2. Vérification que le mot de passe actuel est correct
+        if (!Hash::check($request->currentPassword, $user->password)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Le mot de passe actuel est incorrect.'
+            ], 422); // Code 422: Unprocessable Entity
+        }
+
+        // 3. Mise à jour sécurisée en base de données
+        $user->update([
+            'password' => Hash::make($request->newPassword)
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Mot de passe mis à jour avec succès.'
+        ]);
     }
 }

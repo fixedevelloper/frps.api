@@ -174,7 +174,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('{id}', [UserController::class, 'storeOrUpdate']);
         Route::delete('{id}', [UserController::class, 'destroy']);
     });
-
+    Route::post('/reset-password', [UserController::class, 'resetToDefault']);
+    Route::post('/change-password', [UserController::class, 'updatePassword']);
+    Route::post('/update-info', [UserController::class, 'updateInfo']);
     Route::prefix('agents')->group(function () {
         Route::get('/', [SettingController::class, 'getAgents']);
         Route::post('/', [SettingController::class, 'storeAgent']);
@@ -185,7 +187,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('customers')->group(function () {
         Route::get('/', [SettingController::class, 'getCustomers']);
         Route::get('/{id}', [CustomerController::class, 'getCustomerById']);
-        Route::get('info', [CustomerController::class, 'getInfo']);
+        Route::get('info/me', [CustomerController::class, 'getInfo']);
         Route::post('update', [CustomerController::class, 'updateInfo']);
         Route::get('{id}/advantages', [AdvantageController::class, 'customerAdvantages']);
         Route::delete('/{id}', [UserController::class, 'destroy']);

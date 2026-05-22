@@ -129,7 +129,7 @@
             <div class="info-title">Adressé à</div>
             <strong>{{ $commande->customer->name }}</strong><br>
             {{ $commande->customer->address ?? 'Adresse non spécifiée' }}<br>
-            Tél : {{ $commande->customer->phone ?? 'N/A' }}<br>
+            Code : {{ $commande->customer->code ?? 'N/A' }}<br>
             Date : {{ now()->format('d/m/Y') }}
         </td>
     </tr>

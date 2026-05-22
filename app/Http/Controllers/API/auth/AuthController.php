@@ -43,9 +43,11 @@ class AuthController extends Controller
     {
         $credentials = $request->only('phone', 'password');
 
+        logger($credentials);
         if (!Auth::attempt($credentials)) {
             return Helpers::unauthorized(['message' => 'Identifiants invalides'], 401);
         }
+        logger('pert');
 
         $user = auth()->user();
 
