@@ -113,6 +113,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('paiements', [OrderController::class, 'paiementFacture']);
     Route::post('simulation/paiements', [OrderController::class, 'paiementFactureMobile']);
 
+        Route::post('/payments/{id}/handle', [OrderController::class, 'handleStatus']);
+
     // --- LITIGES & RETOURS ---
     Route::prefix('litiges')->group(function () {
         Route::get('customer', [LitigeController::class, 'getLitiges']);

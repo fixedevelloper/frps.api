@@ -1162,4 +1162,34 @@ class OrderController extends Controller
             'data' => $item
         ]);
     }
+    public function handleStatus(Request $request, $id)
+    {
+        $request->validate([
+            'action' => 'required|in:confirm,reject'
+        ]);
+
+        $payment = Paiement::findOrFail($id);
+
+        // Sécurité : Éviter de modifier un paiement déjà validé
+        if ($payment->status === 'paid') {
+            return response()->json(['status' => 'error', 'message' => 'Cette transaction est déjà validée.'], 422);
+        }
+
+        if ($request->action === 'confirm') {
+            $payment->update(['status' => 'paid']);
+
+            // Optionnel : Mettre à jour le statut global de la commande ou ajuster la caisse/le stock ici
+
+            $message = "Transaction validée et confirmée.";
+        } else {
+            $payment->update(['status' => 'failed']); // ou 'failed'
+            $message = "Transaction rejetée.";
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $message,
+            'payment' => $payment
+        ]);
+    }
 }
